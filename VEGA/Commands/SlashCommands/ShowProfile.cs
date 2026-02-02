@@ -1,9 +1,11 @@
+using Core.CustomCommandAttributes;
 using Exceptions;
 using Microsoft.AspNetCore.Mvc.Routing;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
+using Resources;
 
 namespace SlashCommands;
 
@@ -11,6 +13,7 @@ public class ShowProfile :  ApplicationCommandModule<ApplicationCommandContext>
 {
     const string SIZE_URL_PARAM = "?size=512";
 
+    [DefferedResponse]
     [SlashCommand("showprofile", "Show avatar and banner of a user in high res")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task Execute(
@@ -21,28 +24,18 @@ public class ShowProfile :  ApplicationCommandModule<ApplicationCommandContext>
         string strUserId
     )
     {
-        // Defer message response before any API call
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage()
-        );
-
         // Sanitize input
         strUserId = new string(strUserId.Where(char.IsDigit).ToArray());
 
         // Validate user ID
-        if (!ulong.TryParse(strUserId, out ulong userId)) throw new SlashCommandBusinessException("Incorrect ID", true);
+        if (!ulong.TryParse(strUserId, out ulong userId)) throw new SlashCommandBusinessException(Strings.Exceptions.IncorrectId);
 
         try
         {
-            User user = await Context.Client.Rest.GetUserAsync(userId) ?? throw new SlashCommandBusinessException("User not found");
+            User user = await Context.Client.Rest.GetUserAsync(userId) ?? throw new SlashCommandBusinessException(Strings.Exceptions.UserNotFound);
 
             ImageUrl? avatarUrl = user.GetAvatarUrl();
             ImageUrl? bannerUrl = user.GetBannerUrl();
-
-            string res = $"{avatarUrl}{SIZE_URL_PARAM}";
-            if(bannerUrl is not null)
-                res += $"\n{bannerUrl}{SIZE_URL_PARAM}";
-
 
             var embed = new EmbedProperties
             {
@@ -52,17 +45,17 @@ public class ShowProfile :  ApplicationCommandModule<ApplicationCommandContext>
                 {
                     new EmbedFieldProperties
                     {
-                        Name = "Username",
+                        Name = ResourceHelper.GetString(Strings.Commands.Username, Context.Interaction.UserLocale),
                         Value = user.Username
                     },
                     new EmbedFieldProperties
                     {
-                        Name = "Creation date",
+                        Name = ResourceHelper.GetString(Strings.Commands.CreationDate, Context.Interaction.UserLocale),
                         Value = user.CreatedAt.ToString("dd/MM/yy")
                     },
                     new EmbedFieldProperties
                     {
-                        Name = "User ID",
+                        Name = ResourceHelper.GetString(Strings.Commands.UserId, Context.Interaction.UserLocale),
                         Value = $"`{user.Id}`"
                     }
                 }
@@ -83,7 +76,7 @@ public class ShowProfile :  ApplicationCommandModule<ApplicationCommandContext>
             }
 
             if(bannerUrl is not null)
-                embed.Image = $"\n{bannerUrl}{SIZE_URL_PARAM}";
+                embed.Image = $"{bannerUrl}{SIZE_URL_PARAM}";
 
             if(avatarUrl is not null)
                 embed.Thumbnail = new EmbedThumbnailProperties($"{avatarUrl}{SIZE_URL_PARAM}");
@@ -95,9 +88,8 @@ public class ShowProfile :  ApplicationCommandModule<ApplicationCommandContext>
                 }
             );
         }
-        catch (SlashCommandException ex)
+        catch (SlashCommandException)
         {
-            ex.Deferred = true;
             throw;
         }
     }

@@ -1,3 +1,4 @@
+using Core.CustomCommandAttributes;
 using Exceptions;
 using Microsoft.Extensions.DependencyInjection;
 using Models.Entities;
@@ -6,7 +7,9 @@ using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
 using Services;
+using Resources;
 using static Core.GlobalRegistry;
+using NetCord.Services.Commands;
 
 namespace SlashCommands;
 
@@ -19,6 +22,7 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
     const int RESPONSE_MAX_LENGTH = 2000;
     
 
+    [DefferedResponse]
     [SubSlashCommand("list", "List triggers on this server")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task List()
@@ -33,22 +37,18 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
 
         if (triggers.Count == 0)
         {
-            resMessages.Add("There are no triggers on this server");
+            resMessages.Add(ResourceHelper.GetString(Strings.Commands.NoTriggersOnServer, Context.Interaction.UserLocale));
         }
         else
         {
-            resMessages.Add("## Current triggers on this server");
+            resMessages.Add(ResourceHelper.GetString(Strings.Commands.CurrentTriggersHeader, Context.Interaction.UserLocale));
 
             for (int i = 0; i < triggers.Count; i++)
             {
-                string currentTriggerInfo = "";
-                
                 Trigger iTgr = triggers[i];
-                currentTriggerInfo += $"\n{i}.";
-                currentTriggerInfo += $"\n> **Pattern** : `{iTgr.Pattern}`";
-                currentTriggerInfo += $"\n> **Response** : `{iTgr.Response}`";
-                currentTriggerInfo += $"\n> **Regex options** : `{iTgr.RegexOptions}`";
-                currentTriggerInfo += $"\n> **Ping on reply** : {iTgr.PingOnReply}";
+                string currentTriggerInfo = ResourceHelper.GetString(
+                    Strings.Commands.TriggerInfo, Context.Interaction.UserLocale, i, iTgr.Pattern, iTgr.Response, iTgr.RegexOptions, iTgr.PingOnReply
+                );
 
                 // Discord message char limit is 2000
                 if (resMessages.Last().Length + currentTriggerInfo.Length > 2000)
@@ -60,12 +60,12 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
             }
         }
 
-        // Send initial message response
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.Message(resMessages[0])
+        // Send first part of response
+        await Context.Interaction.SendFollowupMessageAsync(
+            resMessages[0]
         );
 
-        // Send eventual additionnal messages
+        // Send eventual additionnal messages if limited by limit of 2000 chars
         if (resMessages.Count > 1)
         {
             for (int i = 1; i < resMessages.Count; i++)
@@ -75,7 +75,7 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
         }
     }
 
-
+    [DefferedResponse]
     [SubSlashCommand("add", "Add a new trigger")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
@@ -101,20 +101,22 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
         if (
             regex.Length > REGEX_MAX_LENGTH || regex.Length < REGEX_MIN_LENGTH ||
             response.Length > RESPONSE_MAX_LENGTH || response.Length < RESPONSE_MIN_LENGTH
-        ) throw new SlashCommandBusinessException("Invalid params");
+        ) throw new SlashCommandBusinessException(Strings.Exceptions.InvalidParams);
 
         GuildSettingsService service = MainServiceProvider.GetRequiredService<GuildSettingsService>();
-        var guildId = Context.Interaction.GuildId ?? throw new SlashCommandBusinessException("Unable to retrieve guild");
+        var guildId = 
+            Context.Interaction.GuildId ?? throw new SlashCommandBusinessException(Strings.Exceptions.UnableToRetrieveGuild);
 
-        Trigger newTrigger = new Trigger(guildId, regex, response, regexOptions);
-        
+        // Create and add new trigger
+        Trigger newTrigger = new Trigger(guildId, regex, response, regexOptions);        
         _ = await service.AddTrigger(guildId, newTrigger);
 
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.Message($"Added trigger with pattern `/{regex}/{regexOptions}`")
+        await Context.Interaction.SendFollowupMessageAsync(
+            ResourceHelper.GetString(Strings.Commands.TriggerAdded, Context.Interaction.UserLocale, regex, regexOptions)
         );
     }
 
+    [DefferedResponse]
     [SubSlashCommand("delete", "Delete a trigger by ID (see ID in trigger list)")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
@@ -126,15 +128,12 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
     )
     {
         GuildSettingsService service = MainServiceProvider.GetRequiredService<GuildSettingsService>();
-        ulong guildId = Context.Interaction.GuildId ?? throw new SlashCommandBusinessException("Unable to retrieve guild");
-        bool deleted = await service.DeleteTrigger(guildId, triggerIndex);
+        ulong guildId = Context.Interaction.GuildId ?? throw new SlashCommandBusinessException(Strings.Exceptions.UnableToRetrieveGuild);
 
-        if (!deleted)
-            throw new SlashCommandBusinessException("Trigger deletion failed");
-
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.Message($"Removed trigger successfuly")
+        string? deletedPattern = await service.DeleteTrigger(guildId, triggerIndex) ?? throw new SlashCommandBusinessException(Strings.Exceptions.TriggerNotFound);
+        
+        await Context.Interaction.SendFollowupMessageAsync(
+            ResourceHelper.GetString(Strings.Commands.TriggerDeleted, Context.Interaction.UserLocale, deletedPattern)
         );
     }
-
 }

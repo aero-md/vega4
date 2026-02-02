@@ -1,4 +1,4 @@
-using Core.Models;
+using Models.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Models.Entities;
@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<GuildSettings> GuildSettings { get; set; }
     public DbSet<Trigger> Triggers { get; set; }
 
+
     // Feeds properties
     private const string FEED_TABLE_NAME = "feeds";
     public DbSet<FeedProperties> FeedProperties { get; set; }
@@ -21,10 +22,10 @@ public class AppDbContext : DbContext
     public DbSet<FeedPostReceit> FeedHistory { get; set; }
 
 
-    private Configuration _config { get; }
+    private VegaConfiguration _config { get; }
 
 
-    public AppDbContext(Configuration config)
+    public AppDbContext(VegaConfiguration config)
     {
         _config = config;
     }

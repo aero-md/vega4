@@ -1,8 +1,10 @@
+using Core.CustomCommandAttributes;
 using Exceptions;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
+using Resources;
 
 namespace SlashCommands;
 
@@ -11,6 +13,7 @@ public class ClearMsgs :  ApplicationCommandModule<ApplicationCommandContext>
     const int MSG_COUNT_MIN = 1;
     const int MSG_COUNT_MAX = 100;
     
+    [DefferedResponse(ephemeral: true)]
     [SlashCommand("clear", "Deletes recent messages")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
@@ -28,11 +31,7 @@ public class ClearMsgs :  ApplicationCommandModule<ApplicationCommandContext>
         // Don't trust Discord on minmax values validation
         if (
             msgCount > MSG_COUNT_MAX || msgCount < MSG_COUNT_MIN
-        ) throw new SlashCommandBusinessException("Invalid params");
-
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage(MessageFlags.Ephemeral)
-        );
+        ) throw new SlashCommandBusinessException(Strings.Exceptions.InvalidParams);
 
         try
         {
@@ -60,14 +59,33 @@ public class ClearMsgs :  ApplicationCommandModule<ApplicationCommandContext>
             await Context.Interaction.SendFollowupMessageAsync(
                 new InteractionMessageProperties
                 {
-                    Content = $"Here you go, I deleted {msgIds.Count} messages !",
+                    Content = ResourceHelper.GetString(Strings.Commands.DeletedMessages, Context.Interaction.UserLocale, msgIds.Count),
                     Flags = MessageFlags.Ephemeral
                 }
             );
         }
         catch(Exception ex)
         {
-            throw new SlashCommandGenericException(ex.Message, true);
+            throw new SlashCommandGenericException(ex.Message);
         }
+    }
+
+
+    [DefferedResponse]
+    [RequireSuperAdmin]
+    // TODO : attribute to signal to register command to bot owner guild only
+    [SlashCommand("adminclear", "Deletes recent messages")]
+    [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
+    [RequireBotPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
+    public async Task ExecuteAsSuperAdmin(
+        [SlashCommandParameter(
+            Name = "count",
+            MinValue = MSG_COUNT_MIN,
+            MaxValue = MSG_COUNT_MAX
+        )]
+        int msgCount
+    )
+    {
+        await Execute(msgCount);
     }
 }

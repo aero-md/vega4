@@ -5,7 +5,7 @@ using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
-namespace Models.CommandSpecificModels;
+namespace Models.Business;
 
 public class WaifuCategoryValue
 {

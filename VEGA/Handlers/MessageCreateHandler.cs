@@ -9,16 +9,9 @@ using Services;
 
 namespace Handlers;
 
-public class MessageCreateHandler
+public static class MessageCreateHandler
 {
-    private readonly ILogger<MessageCreateHandler> _logger;
-
-    public MessageCreateHandler(ILogger<MessageCreateHandler> logger)
-    {
-        _logger = logger;
-    }
-
-    public async Task MessageCreate(GatewayClient client, Message message)
+    public static async Task MessageCreate(GatewayClient client, Message message)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -57,7 +50,7 @@ public class MessageCreateHandler
         #endif
     }
 
-    private Trigger? checkTriggers(Message msg, GuildSettings settings){
+    private static Trigger? checkTriggers(Message msg, GuildSettings settings){
         Trigger foundPattern;
 
         // Find if the message matches any trigger pattern

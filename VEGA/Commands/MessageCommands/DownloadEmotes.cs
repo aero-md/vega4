@@ -6,20 +6,22 @@ using System.IO.Compression;
 using NetCord;
 using NetCord.Services;
 using Exceptions;
+using Resources;
+using Core.CustomCommandAttributes;
 
 namespace MessageCommands;
 
 public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext>
 {
+    public const int MAX_EMOTES = 20;
+    public const string EMOTE_FILE_NAME_FORMAT = "emote{0}.{1}";
+    public const string EMOTE_ZIPFILE_NAME = "emotes.zip";
+
+    [DefferedResponse]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.AttachFiles)]
     [RequireBotPermissions<ApplicationCommandContext>(Permissions.AttachFiles)]
     [MessageCommand("DownloadEmotes")]
     public async Task Execute(RestMessage message) {
-
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage(MessageFlags.Ephemeral)
-        );
-
         var msgRef = message.MessageSnapshots.FirstOrDefault() ?? null;
         string input = msgRef?.Message.Content ?? message.Content;
         
@@ -27,38 +29,44 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
 
         // Business validations
         if (emotes.Count == 0)
-            throw new SlashCommandBusinessException("No emote found in message.");
-        if (emotes.Count > 20)
-            throw new SlashCommandBusinessException("Too many emotes found in message (max 20).");
+            throw new SlashCommandBusinessException(Strings.Exceptions.NoEmoteInMessage);
+        if (emotes.Count > MAX_EMOTES)
+            throw new SlashCommandBusinessException(Strings.Exceptions.TooManyEmotesInMessage);
 
         using HttpClient client = new HttpClient();
-        // Download all PNGs concurrently
-        var downloadTasks = new List<Task<byte[]>>();
-        foreach (var url in emotes.Select(e => e.Url))
-        {
-            downloadTasks.Add(client.GetByteArrayAsync(url));
-        }
-        byte[][] pngBytesArray = await Task.WhenAll(downloadTasks);
+        
+        // Download all emotes concurrently
+        var downloadTasks = emotes.Select(e => client.GetByteArrayAsync(e.Url)).ToList();
+        byte[][] fileBytesArray = await Task.WhenAll(downloadTasks);
 
         // Create Zip in memory
         using var memoryStream = new MemoryStream();
         using (var zipArchive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            for (int i = 0; i < pngBytesArray.Length; i++)
+            // Zip emotes with their downloaded data to maintain correspondence
+            var emoteDataPairs = emotes.Zip(fileBytesArray, (emote, bytes) => (emote, bytes)).ToList();
+            
+            for (int i = 0; i < emoteDataPairs.Count; i++)
             {
-                var zipEntry = zipArchive.CreateEntry($"emote{i + 1}.png");
+                var (emote, fileBytes) = emoteDataPairs[i];
+                var zipEntry = zipArchive.CreateEntry(string.Format(EMOTE_FILE_NAME_FORMAT, i + 1, emote.Animated ? "gif" : "png"));
                 using var entryStream = zipEntry.Open();
-                await entryStream.WriteAsync(pngBytesArray[i]);
+                await entryStream.WriteAsync(fileBytes);
             }
         }
 
         await Context.Interaction.SendFollowupMessageAsync(
             new InteractionMessageProperties
             {
-                Content = string.Format("Here you are, {0} emote{1} !", emotes.Count, emotes.Count > 1 ? "s" : ""),
+                Content = ResourceHelper.GetString(
+                    emotes.Count > 1 ? Strings.Commands.DlEmotesResultMultiple : Strings.Commands.DlEmotesResultSingle,
+                    Context.Interaction.UserLocale,
+                    emotes.Count
+                ),
+
                 Attachments = new[]
                 {
-                    new AttachmentProperties("emotes.zip", memoryStream)
+                    new AttachmentProperties(EMOTE_ZIPFILE_NAME, memoryStream)
                 }
             }
         );

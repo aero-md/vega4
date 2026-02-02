@@ -1,8 +1,10 @@
 using Core;
+using Core.CustomCommandAttributes;
 using Microsoft.Extensions.DependencyInjection;
 using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
+using Resources;
 
 namespace SlashCommands;
 
@@ -10,6 +12,7 @@ namespace SlashCommands;
 
 public class ClearCommands :  ApplicationCommandModule<ApplicationCommandContext>
 {
+    [DefferedResponse]
     [SlashCommand("clearcommands", "Erase all registered commands for this bot")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task Execute(
@@ -31,10 +34,15 @@ public class ClearCommands :  ApplicationCommandModule<ApplicationCommandContext
             await vegaInstance.ClearAllRegisteredCommandsAsync(guidlId);
         }
 
-        await Context.Interaction.SendResponseAsync
+        await Context.Interaction.SendFollowupMessageAsync
         (
-            InteractionCallback.Message(string.Format("Cleared commands registered {0} for this bot", global ? "globally" : "on this guild"))
+            ResourceHelper.GetString(
+                global ? Strings.Commands.ClearedCommandsGlobal : Strings.Commands.ClearedCommandsGuild,
+                Context.Interaction.UserLocale
+            )
         );
+
+        Environment.Exit(0);
     }
 }
 

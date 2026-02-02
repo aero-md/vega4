@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Exceptions;
 using Microsoft.AspNetCore.WebUtilities;
-using Models.CommandSpecificModels;
+using Models.Business;
 
-namespace Services.CommandSpecificServices;
+namespace Services;
 
 public class WaifuApiService
 {

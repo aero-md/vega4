@@ -2,6 +2,7 @@ using Exceptions;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
+using Resources;
 
 namespace SlashCommands;
 
@@ -32,7 +33,7 @@ public class DiceRoll : ApplicationCommandModule<ApplicationCommandContext>
             diceFaces < FACES_MIN ||
             rollCount > ROLLS_MAX ||
             rollCount < ROLLS_MIN
-        ) throw new SlashCommandBusinessException("Invalid params");
+        ) throw new SlashCommandBusinessException(Strings.Exceptions.InvalidParams);
 
         List<string> results = new();
 

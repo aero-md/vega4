@@ -1,0 +1,46 @@
+{
+  "misc": {
+    "unknown": "Inconnu",
+    "placeholder": "Lorem ipsum dolor sit amet"
+  },
+  "exceptions": {
+    "missingPermission": "Permission manquante",
+    "requireSuperAdmin": "Cette commande nécessite les droits super administrateur.",
+    "incorrectId": "ID incorrect",
+    "userNotFound": "Utilisateur non trouvé",
+    "unableToRetrieveGuild": "Impossible de récupérer le serveur",
+    "invalidParams": "Paramètres invalides",
+    "botMissingPermissions": "Impossible d'exécuter la commande. Le bot manque des permissions : {0}",
+    "userMissingPermissions": "Vous ne pouvez pas utiliser cette commande. Permissions manquantes : {0}",
+    "commandExecutionFailed": "Une erreur s'est produite lors de l'exécution de la commande ¯\\_(ツ)_/¯",
+    "commandExecutionCritical": "Une erreur critique s'est produite lors de l'exécution de la commande. Signalez-le au développeur",
+    "waifuApiCallFailed": "L'appel à l'API waifu a échoué. Code HTTP {0}",
+    "triggerNotFound": "Aucun trigger avec cet ID trouvé sur ce serveur",
+    "tooManyEmotesInMessage": "Trop d'emotes trouvées dans le message (max 20).",
+    "noEmoteInMessage" : "Aucune emote trouvée dans le message."
+  },
+  "commands": {
+    "username": "Nom d'utilisateur",
+    "creationDate": "Date de création",
+    "userId": "ID de l'utilisateur",
+    "deletedMessages": "Voilà, j'ai supprimé {0} messages !",
+    "clearedCommandsGlobal": "Commandes enregistrées globalement supprimées pour ce bot",
+    "clearedCommandsGuild": "Commandes enregistrées sur ce serveur supprimées pour ce bot",
+    "userIdResponse": "L'ID de cet utilisateur est : `{0}`",
+    "noTriggersOnServer": "Il n'y a pas de triggers sur ce serveur",
+    "currentTriggersHeader": "## Triggers actuels sur ce serveur",
+    "triggerInfo": "\n{0}.\n> **Motif** : `{1}`\n> **Réponse** : `{2}`\n> **Options regex** : `{3}`\n> **Ping à la réponse** : {4}",
+    "triggerAdded": "Trigger ajouté :\n**Motif** : `{0}`\n**Réponse** : `{1}`",
+    "triggerDeleted": "Le trigger avec le motif `{0}` a été supprimé",
+    "activeFeedsOnServer": "Flux actifs sur ce serveur",
+    "noActiveFeedsOnServer": "Il n'y a pas de flux actifs sur ce serveur",
+    "feedCreated": "Flux créé pour le sujet {0}",
+    "feedDelay": "Intervale de temps : {0} minutes",
+    "dlEmotesResultSingle": "Et voilà, {0} emote !",
+    "dlEmotesResultMultiple": "Et voilà, {0} emotes !"
+  },
+  "logs": {
+    "interactionTimeoutWarning": "L'interaction a pris plus de 2 secondes (1 sec de marge) à traiter).",
+    "failedToSendInteractionResponse": "Impossible d'envoyer la réponse à l'interaction."
+  }
+}

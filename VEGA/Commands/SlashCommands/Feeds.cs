@@ -7,7 +7,8 @@ using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
 using Microsoft.Extensions.DependencyInjection;
 using Services;
-using Services.CommandSpecificServices;
+using Core.CustomCommandAttributes;
+using Resources;
 
 namespace SlashCommands;
 
@@ -24,15 +25,11 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
     private readonly FeedService _feedService = MainServiceProvider.GetRequiredService<FeedService>();
 
 
+    [DefferedResponse]
     [SubSlashCommand("list", "Lists all active feeds on this server")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task ListFeeds()
     {
-        // Defer message response before any API call
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage()
-        );
-
         try
         {
             // Retrieve and sort feeds for current guild
@@ -41,7 +38,7 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
 
             if (feeds.Count == 0)
             {
-                throw new SlashCommandBusinessException("There are no active feeds on this server", true);
+                throw new SlashCommandBusinessException(Strings.Commands.NoActiveFeedsOnServer);
             }
             else
             {
@@ -49,7 +46,7 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
 
                 var embed = new EmbedProperties
                 {
-                    Title = "Active feeds on this server",
+                    Title = ResourceHelper.GetString(Strings.Commands.ActiveFeedsOnServer, Context.Interaction.UserLocale),
                 };
 
                 foreach (var feed in feeds)
@@ -57,7 +54,11 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
                     var field = new EmbedFieldProperties
                     {
                         Name = feed.Topic,
-                        Value = $"Delay : {feed.IntervalInMinutes} minutes"
+                        Value = ResourceHelper.GetString(
+                            Strings.Commands.FeedDelay,
+                            Context.Interaction.UserLocale,
+                            feed.IntervalInMinutes
+                        )
                     };
                     fields.Add(field);
                 }
@@ -73,18 +74,14 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
                 );
             }
         }
-        catch (SlashCommandBusinessException ex)
-        {
-            ex.Deferred = true;
-            throw;
-        }
         catch (Exception ex)
         {
-            throw new SlashCommandGenericException(ex.Message, true);
+            throw new SlashCommandGenericException(ex.Message);
         }
 
     }
 
+    [DefferedResponse]
     [SubSlashCommand("delete", "Deletes a feed from this server")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task DeleteFeed(
@@ -95,33 +92,21 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
         int feedId
     )
     {
-        // Defer message response before any API call
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage()
-        );
-
         try
         {
             await _feedService.RemoveFeedAsync(Context.Interaction.Guild!.Id, feedId);
 
             await Context.Interaction.SendFollowupMessageAsync(
-                new InteractionMessageProperties
-                {
-                    Content = "lorem ipsum"
-                }
+                "lorem ipsum"
             );
-        }
-        catch (SlashCommandBusinessException ex)
-        {
-            ex.Deferred = true;
-            throw;
         }
         catch (Exception ex)
         {
-            throw new SlashCommandGenericException(ex.Message, true);
+            throw new SlashCommandGenericException(ex.Message);
         }
     }
 
+    [DefferedResponse]
     [SubSlashCommand("create", "Creates a new feed, to regularly send content from a Subreddit, in this channel")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task CreateNewFeed(
@@ -148,11 +133,6 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
         int startAtMinute = -1
     )
     {
-        // Defer message response before any ASYNC execution
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage()
-        );
-
         try
         {
             await _feedService.CreateNewFeedAsync(
@@ -166,22 +146,13 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
             );
 
             await Context.Interaction.SendFollowupMessageAsync(
-                new InteractionMessageProperties
-                {
-                    Content = $"Feed created for topic {topic}"
-                }
+                ResourceHelper.GetString(Strings.Commands.FeedCreated, Context.Interaction.UserLocale, topic)
             );
         }
-        // Business exception, add info that deferred msg exists and pass down exception
-        catch (SlashCommandBusinessException ex)
-        {
-            ex.Deferred = true;
-            throw;
-        }
-        // Other : classic exception
+        // classic exception
         catch (Exception ex)
         {
-            throw new SlashCommandGenericException(ex.Message, true);
+            throw new SlashCommandGenericException(ex.Message);
         }
     }
 }

@@ -1,0 +1,46 @@
+{
+  "misc": {
+    "unknown": "Unknown",
+    "placeholder": "Lorem ipsum dolor sit amet"
+  },
+  "exceptions": {
+    "missingPermission": "Missing permission",
+    "requireSuperAdmin": "Command requires super admin privileges.",
+    "incorrectId": "Incorrect ID",
+    "userNotFound": "User not found",
+    "unableToRetrieveGuild": "Unable to retrieve guild",
+    "invalidParams": "Invalid params",
+    "botMissingPermissions": "Can't execute command. Bot is missing permissions : {0}",
+    "userMissingPermissions": "You can't use this command. Missing permissions : {0}",
+    "commandExecutionFailed": "Something went wrong while executing command ¯\\_(ツ)_/¯",
+    "commandExecutionCritical": "Something went terribly wrong while executing command. Ask the dev to fix their broken code",
+    "waifuApiCallFailed": "The call to the waifu API failed. Code HTTP {0}",
+    "triggerNotFound": "No trigger with this ID found on this server",
+    "tooManyEmotesInMessage": "Too many emotes found in message (max 20).",
+    "noEmoteInMessage" : "No emote found in message."
+  },
+  "commands": {
+    "username": "Username",
+    "creationDate": "Creation date",
+    "userId": "User ID",
+    "deletedMessages": "Here you go, I deleted {0} messages !",
+    "clearedCommandsGlobal": "Cleared commands registered globally for this bot",
+    "clearedCommandsGuild": "Cleared commands registered on this guild for this bot",
+    "userIdResponse": "This user's ID is : `{0}`",
+    "noTriggersOnServer": "There are no triggers on this server",
+    "currentTriggersHeader": "## Current triggers on this server",
+    "triggerInfo": "\n{0}.\n> **Pattern** : `{1}`\n> **Response** : `{2}`\n> **Regex options** : `{3}`\n> **Ping on reply** : {4}",
+    "triggerAdded": "Trigger added:\n**Pattern**: `{0}`\n**Response**: `{1}`",
+    "triggerDeleted": "Trigger with pattern `{0}` has been deleted",
+    "activeFeedsOnServer": "Active feeds on this server",
+    "noActiveFeedsOnServer": "There are no active feeds on this server",
+    "feedCreated": "Feed created for topic {0}",
+    "feedDelay": "Delay : {0} minutes",
+    "dlEmotesResultSingle": "Here you are, {0} emote !",
+    "dlEmotesResultMultiple": "Here you are, {0} emotes !"
+  },
+  "logs": {
+    "interactionTimeoutWarning": "Interaction took more than 2 (1 sec margin) sec to process).",
+    "failedToSendInteractionResponse": "Failed to send interaction failure response."
+  }
+}

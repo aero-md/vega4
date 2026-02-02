@@ -23,7 +23,7 @@ namespace Core.Configurators
             return new ApplicationCommandServiceBuilder();
         }
 
-        public ApplicationCommandServiceBuilder AddCommandHandlers()
+        public ApplicationCommandServiceBuilder DiscoverCommands()
         {
             var commandModules = Assembly.GetExecutingAssembly()
                 .GetTypes()
