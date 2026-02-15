@@ -13,6 +13,7 @@ namespace SlashCommands;
 public class ClearCommands :  ApplicationCommandModule<ApplicationCommandContext>
 {
     [DefferedResponse]
+    [BackofficeCommand]
     [SlashCommand("clearcommands", "Erase all registered commands for this bot")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     public async Task Execute(

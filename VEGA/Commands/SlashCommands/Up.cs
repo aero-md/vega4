@@ -44,7 +44,7 @@ public class Up : ApplicationCommandModule<ApplicationCommandContext>
             },
             Footer = new EmbedFooterProperties
             {
-                Text = "Be like the penguin. March to the mountains"
+                Text = "How much further could we march, if we were not forced to carry our fears on our backs ?"
             }
         };
 

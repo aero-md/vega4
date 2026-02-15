@@ -79,8 +79,9 @@ public class WaifuApiService
 
         var queryParams = new Dictionary<string, string?>
         {
-            ["is_nsfw"] = false.ToString(),
-            ["included_tags"] = categoryValue,
+            ["IsNsfw"] = false.ToString(),
+            ["IncludedTags"] = categoryValue,
+            ["PageSize"] = count.ToString()
         };
         if (count > 1)
             queryParams.Add("limit", count.ToString());

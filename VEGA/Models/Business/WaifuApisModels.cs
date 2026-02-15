@@ -128,7 +128,7 @@ public class WaifuImApiReference : IApiDefinition
 {
     public class MultiplePicApiResponse
     {
-        [JsonPropertyName("images")]
+        [JsonPropertyName("items")]
         public required IEnumerable<ResponseImageItem> Images {get; set;}
     }
     public class ResponseImageItem
@@ -147,7 +147,6 @@ public class WaifuImApiReference : IApiDefinition
         new(2, "maid"),
         new(3, "uniform"),
         new(5, "oppai"),
-        new(8, "milf"), 
         new(103, "marin-kitagawa"),
         new(105, "raiden-shogun"),
     ];
@@ -166,7 +165,6 @@ public class SfwWaifuCategoryChoicesProvider : IChoicesProvider<ApplicationComma
             new("Fox girl", 4),
             new("Boobs", 5),
             new("Vtuber", 7),
-            new("Milf", 8),
             new("Shinobu Oshino", 101),
             new("Megumin", 102),
             new("Marin Kitagawa", 103),
