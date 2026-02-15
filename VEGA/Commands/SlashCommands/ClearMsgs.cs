@@ -69,23 +69,4 @@ public class ClearMsgs :  ApplicationCommandModule<ApplicationCommandContext>
             throw new SlashCommandGenericException(ex.Message);
         }
     }
-
-
-    [DefferedResponse]
-    [RequireSuperAdmin]
-    // TODO : attribute to signal to register command to bot owner guild only
-    [SlashCommand("adminclear", "Deletes recent messages")]
-    [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
-    [RequireBotPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
-    public async Task ExecuteAsSuperAdmin(
-        [SlashCommandParameter(
-            Name = "count",
-            MinValue = MSG_COUNT_MIN,
-            MaxValue = MSG_COUNT_MAX
-        )]
-        int msgCount
-    )
-    {
-        await Execute(msgCount);
-    }
 }

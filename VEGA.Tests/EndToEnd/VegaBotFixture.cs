@@ -47,7 +47,7 @@ public class VegaBotFixture : IAsyncLifetime
             .AddSingleton<IMemoryCache, MemoryCache>()
             .AddSingleton<Vega>()
             .AddSingleton<FeedService>()
-            .AddSingleton<ReminderService>()
+            //.AddSingleton<ReminderService>()
             .AddSingleton<RestClient>(provider => provider.GetRequiredService<Vega>().Rest)
             .AddScoped<AppDbContext>()
             .AddScoped<GuildSettingsService>()

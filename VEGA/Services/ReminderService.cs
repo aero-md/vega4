@@ -7,6 +7,7 @@ using NetCord;
 using NetCord.Rest;
 using static Core.GlobalRegistry;
 
+/*
 namespace Services;
 
 public class ReminderService
@@ -232,3 +233,4 @@ public class ReminderService
 
     #endregion
 }
+*/

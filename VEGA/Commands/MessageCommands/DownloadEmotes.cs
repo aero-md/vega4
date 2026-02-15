@@ -34,26 +34,26 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
             throw new SlashCommandBusinessException(Strings.Exceptions.TooManyEmotesInMessage);
 
         using HttpClient client = new HttpClient();
-        
-        // Download all emotes concurrently
-        var downloadTasks = emotes.Select(e => client.GetByteArrayAsync(e.Url)).ToList();
-        byte[][] fileBytesArray = await Task.WhenAll(downloadTasks);
+
+        // Download all PNGs concurrently
+        var downloadTasks = emotes.Select(e => client.GetByteArrayAsync(e.Url).ContinueWith(t => Tuple.Create(t.Result, e))).ToList();
+
+        List<Tuple<byte[], CustomEmote>> emoteDataBytes = (await Task.WhenAll(downloadTasks)).ToList();
 
         // Create Zip in memory
         using var memoryStream = new MemoryStream();
         using (var zipArchive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            // Zip emotes with their downloaded data to maintain correspondence
-            var emoteDataPairs = emotes.Zip(fileBytesArray, (emote, bytes) => (emote, bytes)).ToList();
-            
-            for (int i = 0; i < emoteDataPairs.Count; i++)
+            for (int i = 0; i < emoteDataBytes.Count; i++)
             {
-                var (emote, fileBytes) = emoteDataPairs[i];
-                var zipEntry = zipArchive.CreateEntry(string.Format(EMOTE_FILE_NAME_FORMAT, i + 1, emote.Animated ? "gif" : "png"));
+                var bytes = emoteDataBytes[i].Item1;
+                var emoteInfo = emoteDataBytes[i].Item2;
+                var zipEntry = zipArchive.CreateEntry(string.Format(EMOTE_FILE_NAME_FORMAT, i + 1, emoteInfo.Animated ? "gif" : "png"));
                 using var entryStream = zipEntry.Open();
-                await entryStream.WriteAsync(fileBytes);
+                await entryStream.WriteAsync(bytes);
             }
         }
+        memoryStream.Seek(0, SeekOrigin.Begin);
 
         await Context.Interaction.SendFollowupMessageAsync(
             new InteractionMessageProperties

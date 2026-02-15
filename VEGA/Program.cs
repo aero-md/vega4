@@ -15,7 +15,7 @@ VegaConfiguration configuration = new VegaConfiguration
 (
     appSettings.GetValue<string>("botToken") ?? throw new Exception("token not found"),
     appSettings.GetSection("postgres").GetValue<string>("connexionString") ?? throw new Exception("postgres connexion string not found"),
-    appSettings.GetValue<List<ulong>>("superAdminUserIds"), // possibly null
+    appSettings.GetSection("superAdminUserIds").Get<List<ulong>>(), // GetValue doesn't work for collections
     appSettings.GetValue<ulong?>("backofficeGuildId") // possibly null
 );
 
