@@ -41,7 +41,8 @@ public class GuildSettingsService
             return cachedSettings!;
 
         var dbSettings = await _dbContext.GuildSettings
-                                    .Include(g => g.Triggers) // Eagerly load Triggers
+                                    .AsNoTracking()  // Keep entities detached so cache doesn't hold tracked entities
+                                    .Include(g => g.Triggers)
                                     .FirstOrDefaultAsync(g => g.GuildId == guildId);
         // Found in BDD
         if (dbSettings != null)
@@ -74,21 +75,48 @@ public class GuildSettingsService
         if (guildId != newSettings.GuildId)
             throw new SlashCommandBusinessException("GuildId and GuildSettings ID mismatch");
 
-        GuildSettings? existingSettings = _dbContext.GuildSettings.Find(guildId);
-        if (existingSettings is null)
+        // Check if the entity already exists in DB (no tracking, just a check)
+        bool exists = await _dbContext.GuildSettings.AnyAsync(g => g.GuildId == guildId);
+
+        if (!exists)
         {
+            // New entity: attach the whole graph as Added
             _dbContext.GuildSettings.Add(newSettings);
         }
         else
         {
-            _dbContext.Entry(existingSettings).CurrentValues.SetValues(newSettings);
-            // Handle triggers separately if needed
+            // Existing entity: attach it so EF tracks it, then handle triggers diff
+            _dbContext.GuildSettings.Update(newSettings);
+
+            // Mark new triggers (default Guid) as Added, existing ones as Modified
+            foreach (var trigger in newSettings.Triggers)
+            {
+                var entry = _dbContext.Entry(trigger);
+                if (trigger.TriggerId == Guid.Empty)
+                    entry.State = EntityState.Added;
+                else
+                    entry.State = EntityState.Modified;
+            }
+
+            // Delete triggers that were removed from the list
+            var currentTriggerIds = newSettings.Triggers
+                .Where(t => t.TriggerId != Guid.Empty)
+                .Select(t => t.TriggerId)
+                .ToHashSet();
+
+            var triggersToDelete = await _dbContext.Triggers
+                .Where(t => t.GuildId == guildId && !currentTriggerIds.Contains(t.TriggerId))
+                .ToListAsync();
+
+            _dbContext.Triggers.RemoveRange(triggersToDelete);
         }
         
-        // If oject does exist its changes are already being tracked
         await _dbContext.SaveChangesAsync();
 
-        // Update cache
+        // Detach all tracked entities to keep the DbContext clean
+        _dbContext.ChangeTracker.Clear();
+
+        // Update cache with the detached entity
         _cache.Set(GetCacheKey(guildId), newSettings);
 
         return newSettings;

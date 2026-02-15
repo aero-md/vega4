@@ -40,7 +40,7 @@ public class ClearCache : ApplicationCommandModule<ApplicationCommandContext>
             InteractionCallback.Message(
                 new InteractionMessageProperties
                 {
-                    Content = ResourceHelper.GetString(messageKey, Context.Interaction.UserLocale, guildId),
+                    Content = ResourceHelper.GetString(messageKey, Context.Interaction.UserLocale),
                     Flags = MessageFlags.Ephemeral
                 }
             )
@@ -63,7 +63,7 @@ public class ClearCache : ApplicationCommandModule<ApplicationCommandContext>
             InteractionCallback.Message(
                 new InteractionMessageProperties
                 {
-                    Content = ResourceHelper.GetString(messageKey, Context.Interaction.UserLocale, guildId),
+                    Content = ResourceHelper.GetString(messageKey, Context.Interaction.UserLocale),
                     Flags = MessageFlags.Ephemeral
                 }
             )
