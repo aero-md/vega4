@@ -14,6 +14,9 @@ public class Vega
     private ShardedGatewayClient ShardedClient { get; set; } = null!;
     // Initialize the command service so the property is non-null after construction
     private ApplicationCommandService<ApplicationCommandContext> ApplicationCommandService { get; set; } = null!;
+    
+    // Public access to the RestClient from ShardedGatewayClient
+    public RestClient Rest => ShardedClient.Rest;
 
     # region Constructor and Initializing
 

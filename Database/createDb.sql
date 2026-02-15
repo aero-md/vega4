@@ -61,6 +61,18 @@ CREATE TABLE public.feeds_recent_posts (
     posted_at timestamp NOT NULL
 );
 
+-- Table: reminders
+CREATE TABLE public.reminders (
+    reminder_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id bigint NOT NULL,
+    guild_id bigint NOT NULL,
+    channel_id bigint NOT NULL,
+    message text NOT NULL,
+    remind_at timestamp NOT NULL,
+    created_at timestamp DEFAULT now() NOT NULL,
+    is_completed boolean DEFAULT false NOT NULL
+);
+
 -- ============================================
 -- 5) PRIMARY KEYS
 -- ============================================
@@ -76,6 +88,9 @@ ALTER TABLE public.triggers
 
 ALTER TABLE public.feeds_recent_posts
     ADD CONSTRAINT feeds_recent_posts_pkey PRIMARY KEY (feed_id, post_id);
+
+ALTER TABLE public.reminders
+    ADD CONSTRAINT reminders_pkey PRIMARY KEY (reminder_id);
 
 -- ============================================
 -- 6) FOREIGN KEYS
@@ -102,6 +117,13 @@ ALTER TABLE public.feeds_recent_posts
     REFERENCES public.feeds (feed_id)
     ON DELETE CASCADE;
 
+-- reminders.guild_id FK guild_settings.guild_id
+ALTER TABLE public.reminders
+    ADD CONSTRAINT reminders_guild_fk
+    FOREIGN KEY (guild_id)
+    REFERENCES public.guild_settings (guild_id)
+    ON DELETE CASCADE;
+
 -- ============================================
 -- 7) INDEXES (optimisation)
 -- ============================================
@@ -118,6 +140,15 @@ CREATE INDEX idx_frp_feed_id ON public.feeds_recent_posts (feed_id);
 
 -- Pour les recherches par post_id
 CREATE INDEX idx_frp_post_id ON public.feeds_recent_posts (post_id);
+
+-- Pour les recherches de reminders par utilisateur et guild
+CREATE INDEX idx_reminders_user_guild ON public.reminders (user_id, guild_id);
+
+-- Pour les recherches de reminders non complétés à envoyer
+CREATE INDEX idx_reminders_remind_at ON public.reminders (remind_at) WHERE is_completed = false;
+
+-- Pour les recherches par guild
+CREATE INDEX idx_reminders_guild_id ON public.reminders (guild_id);
 
 -- ============================================
 -- END

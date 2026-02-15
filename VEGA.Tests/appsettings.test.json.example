@@ -1,0 +1,11 @@
+{
+  "_comment": "This is an example configuration file. Copy this to appsettings.test.json and fill in your values",
+  "botToken": "YOUR_TEST_BOT_TOKEN_HERE",
+  "postgres": {
+    "connexionString": "Host=localhost;Database=vega_test;Username=postgres;Password=postgres"
+  },
+  "testGuildId": "123456789012345678",
+  "testChannelId": "123456789012345678",
+  "backofficeGuildId": null,
+  "superAdminUserIds": []
+}

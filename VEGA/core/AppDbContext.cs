@@ -12,6 +12,8 @@ public class AppDbContext : DbContext
     public DbSet<GuildSettings> GuildSettings { get; set; }
     public DbSet<Trigger> Triggers { get; set; }
 
+    // Reminders
+    //public DbSet<Reminder> Reminders { get; set; }
 
     // Feeds properties
     private const string FEED_TABLE_NAME = "feeds";
@@ -61,6 +63,18 @@ public class AppDbContext : DbContext
                     .HasForeignKey(t => t.GuildId)      // Foreign Key
                     .OnDelete(DeleteBehavior.Cascade);  // On delete cascade
 
+        /*
+        // Define Reminder entityId
+        modelBuilder.Entity<Reminder>()
+                    .HasKey(r => r.ReminderId);
+
+        // Define ReminderId default value : new GUID
+        modelBuilder.Entity<Reminder>()
+                    .Property(r => r.ReminderId)
+                    .HasDefaultValueSql("gen_random_uuid()")  // Default value : new Guid 
+                    .ValueGeneratedOnAdd();
+        */
+        
         // Define FeedProperties entityId with explicit column name
         modelBuilder.Entity<FeedProperties>()
                     .ToTable("feeds") // Set custom table name

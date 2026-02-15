@@ -45,6 +45,27 @@ public static class Strings
         public const string FeedDelay = "commands.feedDelay";
         public const string DlEmotesResultSingle = "commands.dlEmotesResultSingle";
         public const string DlEmotesResultMultiple = "commands.dlEmotesResultMultiple";
+        public const string ReminderTimeRequired = "commands.reminderTimeRequired";
+        public const string ReminderInvalidTime = "commands.reminderInvalidTime";
+        public const string ReminderSet = "commands.reminderSet";
+        public const string NoActiveReminders = "commands.noActiveReminders";
+        public const string YourActiveReminders = "commands.yourActiveReminders";
+        public const string ReminderDeleted = "commands.reminderDeleted";
+        public const string RemindersReset = "commands.remindersReset";
+        public const string ReminderSnoozed = "commands.reminderSnoozed";
+        public const string InvalidGuildIdFormat = "commands.invalidGuildIdFormat";
+        public const string CacheClearedForGuild = "commands.cacheClearedForGuild";
+        public const string CacheNotFoundForGuild = "commands.cacheNotFoundForGuild";
+        public const string ErrorClearingCache = "commands.errorClearingCache";
+        public const string CacheClearedForCurrentGuild = "commands.cacheClearedForCurrentGuild";
+        public const string CacheNotFoundForCurrentGuild = "commands.cacheNotFoundForCurrentGuild";
+        public const string CacheInfoTitle = "commands.cacheInfoTitle";
+        public const string CacheInfoDescription = "commands.cacheInfoDescription";
+        public const string CacheInfoDurationLabel = "commands.cacheInfoDurationLabel";
+        public const string CacheInfoDurationValue = "commands.cacheInfoDurationValue";
+        public const string CacheInfoDataLabel = "commands.cacheInfoDataLabel";
+        public const string CacheInfoDataValue = "commands.cacheInfoDataValue";
+        public const string CacheInfoFooter = "commands.cacheInfoFooter";
     }
     
     public static class Logs

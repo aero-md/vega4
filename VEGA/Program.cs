@@ -15,7 +15,8 @@ VegaConfiguration configuration = new VegaConfiguration
 (
     appSettings.GetValue<string>("botToken") ?? throw new Exception("token not found"),
     appSettings.GetSection("postgres").GetValue<string>("connexionString") ?? throw new Exception("postgres connexion string not found"),
-    appSettings.GetValue<List<ulong>>("superAdminUserIds") // possibly null
+    appSettings.GetValue<List<ulong>>("superAdminUserIds"), // possibly null
+    appSettings.GetValue<ulong?>("backofficeGuildId") // possibly null
 );
 
 // Build DI container
@@ -26,6 +27,8 @@ var serviceProvider = new ServiceCollection()
                             .AddSingleton<Vega>()
                             // Feeds service
                             .AddSingleton<FeedService>()
+                            // Reminder service
+                            //.AddSingleton<ReminderService>()
                             // Scoped
                             .AddScoped<AppDbContext>()
                             .AddScoped<GuildSettingsService>()
@@ -43,4 +46,9 @@ GlobalRegistry.SetMainServiceProvider(serviceProvider);
 var vega = serviceProvider.GetRequiredService<Vega>();
 // Init and launch
 await vega.Initialize(configuration.BotToken);
+
+// Initialize ReminderService now that Vega (and its RestClient) is ready
+//var reminderService = serviceProvider.GetRequiredService<ReminderService>();
+//await reminderService.Initialize(vega.Rest);
+
 await vega.Launch();

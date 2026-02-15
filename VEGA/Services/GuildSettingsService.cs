@@ -143,4 +143,18 @@ public class GuildSettingsService
 
         return pattern;
     }
+
+
+    /// <summary>
+    /// Clear the cache for a specific guild
+    /// </summary>
+    /// <param name="guildId"></param>
+    /// <returns>True if the cache entry existed and was removed, false if it didn't exist</returns>
+    public bool ClearCacheForGuild(ulong guildId)
+    {
+        var cacheKey = GetCacheKey(guildId);
+        bool existed = _cache.TryGetValue(cacheKey, out _);
+        _cache.Remove(cacheKey);
+        return existed;
+    }
 }

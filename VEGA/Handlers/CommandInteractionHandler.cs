@@ -35,6 +35,9 @@ public static class CommandInteractionHandler
         // Find command info
         ApplicationCommandInfo<ApplicationCommandContext>? command = appCommandService.GetCommands().SingleOrDefault(c => c.Name == interaction.Data.Name);
 
+        // Variable to hold attributes from either command or subcommand
+        IReadOnlyDictionary<Type, IReadOnlyList<Attribute>>? commandAttributes = null;
+
         switch (command) 
         {
             // Sub slash command in a slash command group
@@ -43,8 +46,13 @@ public static class CommandInteractionHandler
                 SlashCommandInteraction? slashinteraction = interaction as SlashCommandInteraction;
                 // Find subcommand info
                 ISubSlashCommandInfo<ApplicationCommandContext>? subCommand = slashCommandGroupInfo.SubCommands.SingleOrDefault(x => x.Value.Name == slashinteraction?.Data.Options[0].Name).Value;
-                // Cast subcommand info to ApplicationCommandInfo. We don't need specific subcommand info here
-                command = (ApplicationCommandInfo<ApplicationCommandContext>)subCommand;
+                // Get attributes from subcommand
+                commandAttributes = subCommand?.Attributes;
+                break;
+            
+            // Regular command (not a subcommand)
+            default:
+                commandAttributes = command?.Attributes;
                 break;
             
             // Possible other cases in the future : message command, user command
@@ -53,12 +61,12 @@ public static class CommandInteractionHandler
         
         // Deffered response attribute check + ephemeral option
         Attribute? defferedResponseAttr = null;
-        defferedResponseAttr = command?.Attributes.GetValueOrDefault(typeof(DefferedResponseAttribute))?[0];
+        defferedResponseAttr = commandAttributes?.GetValueOrDefault(typeof(DefferedResponseAttribute))?[0];
         hasDefferedResponse = defferedResponseAttr != null;
         isDefferedResponseEphemeral = (defferedResponseAttr as DefferedResponseAttribute)?.Ephemeral ?? false;
         
         // Super admin requirement check
-        isSuperAdminRequired = command?.Attributes.ContainsKey(typeof(RequireSuperAdminAttribute)) ?? false;
+        isSuperAdminRequired = commandAttributes?.ContainsKey(typeof(RequireSuperAdminAttribute)) ?? false;
 
         try
         {
@@ -136,7 +144,7 @@ public static class CommandInteractionHandler
             errorMsg = ResourceHelper.GetString(Strings.Exceptions.CommandExecutionFailed, interaction.UserLocale);
         }
         // Worst case scenario : unexcepted uncaught exception
-        catch (Exception ex)
+        catch (Exception)
         {
             errorMsg = ResourceHelper.GetString(Strings.Exceptions.CommandExecutionCritical, interaction.UserLocale);
         }

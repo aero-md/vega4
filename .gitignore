@@ -4,3 +4,4 @@ VEGA.Tests/bin/*
 VEGA.Tests/obj/*
 .vscode/*
 appsettings.json
+appsettings.test.json

@@ -10,6 +10,7 @@ using Services;
 using Core.CustomCommandAttributes;
 using Resources;
 
+/* 
 namespace SlashCommands;
 
 [SlashCommand("feed", "Manage feeds for this server")]
@@ -156,3 +157,4 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
         }
     }
 }
+*/

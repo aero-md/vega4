@@ -53,7 +53,7 @@ public interface IApiDefinition
     public string GetBaseUri(bool multiple = false);
     
     /// <summary>
-    /// All categories. NSFW Categories begin at ID 1000
+    /// All categories available in this API. Random/any is 0. Broad categories start at 1. Character specific categories start at 100. NSFW Categories start at 1000.
     /// </summary>
     public List<WaifuCategoryValue> Categories { get; }
 }
@@ -138,7 +138,7 @@ public class WaifuImApiReference : IApiDefinition
     }
 
     public string GetBaseUri(bool multiple = false){
-        return "https://api.waifu.im/search";
+        return "https://api.waifu.im/images";
     }
 
     public List<WaifuCategoryValue> Categories =>
@@ -147,6 +147,7 @@ public class WaifuImApiReference : IApiDefinition
         new(2, "maid"),
         new(3, "uniform"),
         new(5, "oppai"),
+        new(8, "milf"), 
         new(103, "marin-kitagawa"),
         new(105, "raiden-shogun"),
     ];
@@ -165,6 +166,7 @@ public class SfwWaifuCategoryChoicesProvider : IChoicesProvider<ApplicationComma
             new("Fox girl", 4),
             new("Boobs", 5),
             new("Vtuber", 7),
+            new("Milf", 8),
             new("Shinobu Oshino", 101),
             new("Megumin", 102),
             new("Marin Kitagawa", 103),
