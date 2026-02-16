@@ -34,23 +34,29 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
             throw new SlashCommandBusinessException(Strings.Exceptions.TooManyEmotesInMessage);
 
         using HttpClient client = new HttpClient();
-
         // Download all PNGs concurrently
-        var downloadTasks = emotes.Select(e => client.GetByteArrayAsync(e.Url).ContinueWith(t => Tuple.Create(t.Result, e))).ToList();
+        var downloadTasks = new List<Tuple<Task<byte[]>, CustomEmote>>();
+        foreach (var emote in emotes)
+        {
+            downloadTasks.Add(new Tuple<Task<byte[]>, CustomEmote>(client.GetByteArrayAsync(emote.Url), emote));
+        }
 
-        List<Tuple<byte[], CustomEmote>> emoteDataBytes = (await Task.WhenAll(downloadTasks)).ToList();
+        // Await all downloads to complete
+        var emoteDataBytes = await Task.WhenAll(
+            downloadTasks.Select(async tuple => (DataBytes: await tuple.Item1, EmoteInfo: tuple.Item2))
+        );
 
         // Create Zip in memory
         using var memoryStream = new MemoryStream();
         using (var zipArchive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
         {
-            for (int i = 0; i < emoteDataBytes.Count; i++)
+            // For each downloaded emote, create a new entry in the zip file
+            foreach (var tuple in emoteDataBytes)
             {
-                var bytes = emoteDataBytes[i].Item1;
-                var emoteInfo = emoteDataBytes[i].Item2;
-                var zipEntry = zipArchive.CreateEntry(string.Format(EMOTE_FILE_NAME_FORMAT, i + 1, emoteInfo.Animated ? "gif" : "png"));
+                var (dataBytes, emoteInfo) = tuple;
+                var zipEntry = zipArchive.CreateEntry(emoteInfo.Filename);
                 using var entryStream = zipEntry.Open();
-                await entryStream.WriteAsync(bytes);
+                await entryStream.WriteAsync(dataBytes);
             }
         }
         memoryStream.Seek(0, SeekOrigin.Begin);
@@ -80,17 +86,9 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
 
         foreach (Match match in matches)
         {
-            var emote = match.Value;
-            var cleanupRegex = new Regex("[<,>]", RegexOptions.ECMAScript);
-            emote = cleanupRegex.Replace(emote, "");
-
-            var parts = emote.Split(':').Where(x => x != "").ToList();
-
-            //<:huh:1293177600025301062>
-
-            bool isAnimated = parts.Count > 2;
-            string name = parts[0];
-            string id = parts[1];
+            bool isAnimated = match.Groups[1].Success;
+            string name = match.Groups[2].Value;
+            string id = match.Groups[3].Value;
             string filename = string.Format("{0}.{1}", name, isAnimated ? "gif" : "png");
             string url = string.Format("https://cdn.discordapp.com/emojis/{0}.{1}?size=512&quality=lossless", id, isAnimated ? "gif" : "png");
 
