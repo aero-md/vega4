@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Core.CustomCommandAttributes;
 using Models.Core;
 using Resources;
+using Serilog;
 
 namespace Handlers;
 
@@ -170,7 +171,7 @@ public static class CommandInteractionHandler
                     // If not, log and do nothing
                     if (elapsed.TotalSeconds > 2.5)
                     {
-                        Console.WriteLine(Strings.Logs.InteractionTimeoutWarning);
+                        Log.Warning("Interaction response timeout for command {CommandName}", interaction.Data.Name);
                     }
                     else
                     {
@@ -186,16 +187,12 @@ public static class CommandInteractionHandler
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                Console.WriteLine(Strings.Logs.FailedToSendInteractionResponse);
+                Log.Error(ex, "Failed to send interaction error response for command {CommandName}", interaction.Data.Name);
             }
         }
 
         stopwatch.Stop();
-
-        #if DEBUG
-        Console.WriteLine("InteractionCreate handled in {0} ms", stopwatch.ElapsedMilliseconds);
-        #endif
     }
 }

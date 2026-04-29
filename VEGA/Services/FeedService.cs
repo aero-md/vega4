@@ -1,93 +1,164 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
-using System.Threading.Tasks;
 using Core;
 using Exceptions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Resources;
 using Models.Entities;
+using NetCord;
+using NetCord.Rest;
 
 namespace Services;
 
 public class FeedService
 {
-    private readonly AppDbContext _dbContext;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly FeedContentService _contentService;
+    private readonly ILogger<FeedService> _logger;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _timersCancellationTokens = new();
-    
-    public FeedService(AppDbContext dbContext)
-    {
-        _dbContext = dbContext;
+    private RestClient _restClient = null!;
 
-        // On service initialization, load all existing feeds from DB and initiate their timers
-        var existingFeeds = _dbContext.FeedProperties.ToListAsync().Result;
+    public FeedService(
+        IServiceScopeFactory scopeFactory, 
+        FeedContentService contentService, 
+        ILogger<FeedService> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _contentService = contentService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Initializes the service with the RestClient (must be called after Vega.Initialize())
+    /// and loads existing feeds from DB to start their timers.
+    /// </summary>
+    public async Task Initialize(RestClient restClient)
+    {
+        _restClient = restClient;
+
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        
+        var existingFeeds = await dbContext.FeedProperties
+            .Where(f => f.Status == FeedStatus.Active)
+            .ToListAsync();
 
         foreach (var feed in existingFeeds)
         {
-            CancellationTokenSource ccts = new();
-            
             RegisterTimer(feed);
         }
+
+        _logger.LogInformation("FeedService initialized with {FeedCount} active feed(s)", existingFeeds.Count);
     }
+
 
     #region Feed Management methods
 
     /// <summary>
-    /// Adds a new feed to DB and initiates its recurring timer
+    /// Adds a new feed to DB and initiates its recurring timer.
+    /// Validates subreddit name and enforces guild feed limit.
     /// </summary>
     public async Task CreateNewFeedAsync(FeedProperties feedProperties)
     {
-        // Add feedProperties to DB
-        _dbContext.FeedProperties.Add(feedProperties);
-        await _dbContext.SaveChangesAsync();
+        // Validate subreddit name
+        FeedContentService.ValidateSubreddit(feedProperties.Topic);
+
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Read config from DB for current limit
+        var config = await _contentService.GetConfigAsync();
+
+        // Check feed limit per guild
+        var currentFeedCount = await dbContext.FeedProperties
+            .CountAsync(f => f.GuildId == feedProperties.GuildId && f.Status == FeedStatus.Active);
+
+        if (currentFeedCount >= config.MaxFeedsPerGuild)
+        {
+            throw new SlashCommandBusinessException(
+                string.Format(Strings.Exceptions.FeedLimitReached, config.MaxFeedsPerGuild));
+        }
+
+        dbContext.FeedProperties.Add(feedProperties);
+        await dbContext.SaveChangesAsync();
 
         RegisterTimer(feedProperties);
+        
+        _logger.LogInformation("Created feed {FeedId} for r/{Subreddit} in guild {GuildId}", 
+            feedProperties.FeedId, feedProperties.Topic, feedProperties.GuildId);
     }
 
-
     /// <summary>
-    /// Removes a feed from DB and cancels its recurring timer
+    /// Removes a feed from DB by its UUID and cancels its recurring timer
     /// </summary>
-    /// <param name="feedId"></param>
-    /// <returns></returns>
-    public async Task RemoveFeedAsync(ulong guildId, int feedIndex)
+    public async Task RemoveFeedAsync(ulong guildId, Guid feedId)
     {
-        FeedProperties? feed = 
-            await _dbContext.FeedProperties.Where(f => f.GuildId == guildId)
-                                           .OrderByDescending(f => f.CreatedAt)
-                                           .Skip(feedIndex)
-                                           .FirstOrDefaultAsync();
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var feed = await dbContext.FeedProperties
+            .FirstOrDefaultAsync(f => f.GuildId == guildId && f.FeedId == feedId);
 
         if (feed != null)
         {
-            _dbContext.FeedProperties.Remove(feed);
-            await _dbContext.SaveChangesAsync();
+            dbContext.FeedProperties.Remove(feed);
+            await dbContext.SaveChangesAsync();
 
             if (_timersCancellationTokens.TryRemove(feed.FeedId, out var ccts))
             {
-                ccts.Cancel();
+                await ccts.CancelAsync();
                 ccts.Dispose();
             }
+            
+            _logger.LogInformation("Removed feed {FeedId} for r/{Subreddit} from guild {GuildId}", 
+                feedId, feed.Topic, guildId);
         }
         else
         {
-            throw new SlashCommandBusinessException("Feed not found for given guildId and ID");
+            throw new SlashCommandBusinessException(Strings.Exceptions.FeedNotFound);
         }
     }
 
+    /// <summary>
+    /// Returns all feeds for a given guildId (including inactive ones, for display)
+    /// </summary>
+    public async Task<List<FeedProperties>> GetFeedsAsync(ulong guildId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        return await dbContext.FeedProperties
+            .Where(f => f.GuildId == guildId)
+            .OrderByDescending(f => f.CreatedAt)
+            .ToListAsync();
+    }
 
     /// <summary>
-    /// Returns a list of active feeds for a given guildId
+    /// Sets a feed's status to the given value and cancels its timer.
+    /// Used when a feed must be disabled but not deleted (channel gone, subreddit unavailable, etc.)
     /// </summary>
-    /// <param name="guildId"></param>
-    /// <returns></returns>
-    public async Task<List<FeedProperties>> GetActiveFeedsAsync(ulong guildId)
+    private async Task DisableFeedAsync(Guid feedId, FeedStatus reason)
     {
-        List<FeedProperties> feeds = 
-            await _dbContext.FeedProperties
-                            .Where(f => f.GuildId == guildId)
-                            .ToListAsync();
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        return feeds;
+        var feed = await dbContext.FeedProperties.FindAsync(feedId);
+        if (feed != null)
+        {
+            feed.Status = reason;
+            await dbContext.SaveChangesAsync();
+
+            // Cancel and remove the timer
+            if (_timersCancellationTokens.TryRemove(feedId, out var ccts))
+            {
+                await ccts.CancelAsync();
+                ccts.Dispose();
+            }
+            
+            _logger.LogWarning("Disabled feed {FeedId} for r/{Subreddit} — reason: {Reason}", 
+                feedId, feed.Topic, reason);
+        }
     }
 
     #endregion
@@ -96,51 +167,57 @@ public class FeedService
     #region Feed history methods
 
     /// <summary>
-    /// Returns a list of FeedHistoryPost linked to a given feedId
+    /// Returns only the PostIds from history for a given feedId (optimized query)
     /// </summary>
-    public async Task<List<FeedPostReceit>> GetFeedHistoryAsync(Guid feedId)
+    private async Task<HashSet<string>> GetFeedHistoryIdsAsync(Guid feedId)
     {
-        List<FeedPostReceit> postList = 
-            await _dbContext.FeedHistory
-                            .Where(p => p.FeedId == feedId)
-                            .ToListAsync();
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        return postList;
+        var postIds = await dbContext.FeedHistory
+            .Where(p => p.FeedId == feedId)
+            .Select(p => p.PostId)
+            .ToListAsync();
+
+        return postIds.ToHashSet();
     }
 
     /// <summary>
-    /// Returns true/false depending on success of saving a postId in FeedHistoryPost for a given feedId
+    /// Saves a postId to the feed's history, trimming old entries beyond history size limit.
     /// </summary>
-    public async Task<bool> AddPostToFeedHistoryAsync(Guid feedId, string postId)
+    private async Task AddPostToFeedHistoryAsync(Guid feedId, string postId)
     {
-        List<FeedPostReceit> history = 
-            await _dbContext.FeedHistory.Where(p => p.FeedId == feedId)
-                                        .ToListAsync();
+        using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Clear older items exceding max capacity
-        if(history.Count > 99)
+        // Count current history size
+        var historyCount = await dbContext.FeedHistory
+            .CountAsync(p => p.FeedId == feedId);
+
+        // Clear older items exceeding max history size
+        var config = await _contentService.GetConfigAsync();
+        int maxHistory = config.HistorySize;
+        if (historyCount >= maxHistory)
         {
-            var itemsToDelete = history.OrderBy(x => x.PostedAt)
-                                       .Skip(99)
-                                       .ToList();
+            var itemsToDelete = await dbContext.FeedHistory
+                .Where(p => p.FeedId == feedId)
+                .OrderBy(x => x.PostedAt)
+                .Take(historyCount - maxHistory + 1)
+                .ToListAsync();
 
-            _dbContext.FeedHistory.RemoveRange(itemsToDelete);
+            dbContext.FeedHistory.RemoveRange(itemsToDelete);
         }
 
-        // Create new item
+        // Create new history entry
         var newItem = new FeedPostReceit
         {
             FeedId = feedId,
             PostId = postId,
             PostedAt = DateTime.UtcNow
         };
-        // Add new item to context
-        await _dbContext.FeedHistory.AddAsync(newItem);
 
-        //Save changes to DB
-        var result = await _dbContext.SaveChangesAsync();
-
-        return result > 0;
+        await dbContext.FeedHistory.AddAsync(newItem);
+        await dbContext.SaveChangesAsync();
     }
 
     #endregion
@@ -151,41 +228,158 @@ public class FeedService
     private void RegisterTimer(FeedProperties feedProperties)
     {
         CancellationTokenSource ccts = new();
-        
+
         _timersCancellationTokens.AddOrUpdate
         (
             feedProperties.FeedId,
             ccts,
-            (key, existingValue) => ccts
+            (key, existingValue) =>
+            {
+                existingValue.Dispose();
+                return ccts;
+            }
         );
-        
-        _ = LaunchTimer(feedProperties, ccts);
+
+        // Use Task.Run to ensure exceptions are properly observed
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await LaunchTimerAsync(feedProperties, ccts.Token);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Unexpected error in feed timer for {FeedId} (r/{Subreddit})", 
+                    feedProperties.FeedId, feedProperties.Topic);
+            }
+        });
     }
 
     /// <summary>
-    /// Initiates a recurring timer for a given feed
+    /// Initiates a recurring timer for a given feed.
+    /// Implements StartAtMinute alignment and proper disposal.
     /// </summary>
-    /// <param name="feedProperties"></param>
-    /// <param name="ccts"></param>
-    /// <returns></returns>
-    private async Task LaunchTimer(FeedProperties feedProperties, CancellationTokenSource ccts)
+    private async Task LaunchTimerAsync(FeedProperties feedProperties, CancellationToken cancellationToken)
     {
-        PeriodicTimer timer = new(TimeSpan.FromMinutes(feedProperties.IntervalInMinutes));
+        // Wait for start minute alignment if specified
+        if (feedProperties.StartAtMinute >= 0 && feedProperties.StartAtMinute < 60)
+        {
+            var now = DateTime.UtcNow;
+            var targetMinute = new DateTime(now.Year, now.Month, now.Day, now.Hour, feedProperties.StartAtMinute, 0, DateTimeKind.Utc);
+            
+            if (targetMinute <= now)
+                targetMinute = targetMinute.AddHours(1);
+            
+            var delay = targetMinute - now;
+            _logger.LogInformation("Feed {FeedId} (r/{Subreddit}) waiting {Delay} until minute {Minute}", 
+                feedProperties.FeedId, feedProperties.Topic, delay, feedProperties.StartAtMinute);
+            
+            await Task.Delay(delay, cancellationToken);
+        }
+
+        // Use 'using' to properly dispose the timer
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(feedProperties.IntervalInMinutes));
 
         try
         {
-            while (await timer.WaitForNextTickAsync(ccts.Token))
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                // TODO : Implement feed fetching and posting logic here
-
-                Console.WriteLine("Hello World after 10 seconds");
+                await ProcessFeedTickAsync(feedProperties);
             }
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine("Timer cancelled");
+            _logger.LogInformation("Feed timer stopped for {FeedId} (r/{Subreddit})", 
+                feedProperties.FeedId, feedProperties.Topic);
         }
     }
-    
+
+    /// <summary>
+    /// Processes a single tick for a feed:
+    /// 1. Refreshes the subreddit cache if stale
+    /// 2. Picks the next post not in this feed's history
+    /// 3. Sends it to the Discord channel
+    /// 4. Records it in history
+    /// </summary>
+    private async Task ProcessFeedTickAsync(FeedProperties feed)
+    {
+        try
+        {
+            // 0. Read current config from DB
+            var config = await _contentService.GetConfigAsync();
+
+            // 1. Refresh Reddit cache for this subreddit if needed
+            await _contentService.RefreshCacheIfNeededAsync(feed.Topic, config);
+
+            // 2. Get this feed's post history (optimized: only IDs)
+            var historyIds = await GetFeedHistoryIdsAsync(feed.FeedId);
+
+            // 3. Pick next post not already sent (with NSFW filter)
+            var nextPost = _contentService.GetNextPost(feed.Topic, historyIds, feed.AllowNsfw);
+
+            if (nextPost == null)
+            {
+                // No new content available - silent, not an error
+                return;
+            }
+
+            var (content, postId) = nextPost.Value;
+
+            // 4. Send message to the Discord channel
+            try
+            {
+                var channel = await _restClient.GetChannelAsync(feed.ChannelId);
+
+                if (channel is TextChannel textChannel)
+                {
+                    await textChannel.SendMessageAsync(new MessageProperties
+                    {
+                        Content = content
+                    });
+
+                    _logger.LogInformation("Posted {PostId} to channel {ChannelId} for r/{Subreddit}", 
+                        postId, feed.ChannelId, feed.Topic);
+                }
+                else
+                {
+                    _logger.LogWarning("Channel {ChannelId} is not a text channel, skipping feed r/{Subreddit}", 
+                        feed.ChannelId, feed.Topic);
+                    return;
+                }
+            }
+            catch (RestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // Channel was deleted - disable the feed
+                _logger.LogWarning("Channel {ChannelId} not found (deleted?), disabling feed {FeedId}",
+                    feed.ChannelId, feed.FeedId);
+
+                await DisableFeedAsync(feed.FeedId, FeedStatus.ChannelDeleted);
+                return;
+            }
+
+            // 5. Save post to history
+            await AddPostToFeedHistoryAsync(feed.FeedId, postId);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Forbidden 
+                                                             or System.Net.HttpStatusCode.NotFound)
+        {
+            // Subreddit is private (403), banned, or doesn't exist (404) 
+            _logger.LogWarning("Reddit returned {StatusCode} for r/{Subreddit}, disabling feed {FeedId}",
+                ex.StatusCode, feed.Topic, feed.FeedId);
+            
+            await DisableFeedAsync(feed.FeedId, FeedStatus.TopicUnavailable);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.TooManyRequests)
+        {
+            // Rate limited by Reddit - skip this tick, try again next interval
+            _logger.LogWarning("Reddit rate limit hit for r/{Subreddit}, skipping tick", feed.Topic);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing feed for r/{Subreddit} → channel {ChannelId}", 
+                feed.Topic, feed.ChannelId);
+        }
+    }
+
     #endregion
 }

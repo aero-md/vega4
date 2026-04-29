@@ -4,6 +4,7 @@ using Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Models.Entities;
+using Resources;
 using NetCord.JsonModels;
 
 namespace Services;
@@ -73,7 +74,7 @@ public class GuildSettingsService
     {
         // Second level validation -> should have been checked a first time in business code
         if (guildId != newSettings.GuildId)
-            throw new SlashCommandBusinessException("GuildId and GuildSettings ID mismatch");
+            throw new SlashCommandBusinessException(Strings.Exceptions.GuildIdMismatch);
 
         // Check if the entity already exists in DB (no tracking, just a check)
         bool exists = await _dbContext.GuildSettings.AnyAsync(g => g.GuildId == guildId);

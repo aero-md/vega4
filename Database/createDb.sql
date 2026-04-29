@@ -36,10 +36,11 @@ CREATE TABLE public.feeds (
     feed_id uuid DEFAULT gen_random_uuid() NOT NULL,
     guild_id bigint NOT NULL,
     channel_id bigint NOT NULL,
-    params integer NOT NULL,
     topic varchar(255) NOT NULL,
     interval_in_minutes integer NOT NULL,
     start_at_minute integer NOT NULL,
+    allow_nsfw boolean NOT NULL DEFAULT false,
+    status integer NOT NULL DEFAULT 0,
     created_at timestamp NOT NULL
 );
 
@@ -72,6 +73,21 @@ CREATE TABLE public.reminders (
     created_at timestamp DEFAULT now() NOT NULL,
     is_completed boolean DEFAULT false NOT NULL
 );
+
+-- Table: feed_configuration (single-row global config)
+CREATE TABLE public.feed_configuration (
+    id integer NOT NULL DEFAULT 1,
+    fetch_size integer NOT NULL DEFAULT 70,
+    fetch_interval_minutes integer NOT NULL DEFAULT 60,
+    history_size integer NOT NULL DEFAULT 60,
+    sort_mode varchar(20) NOT NULL DEFAULT 'hot',
+    max_feeds_per_guild integer NOT NULL DEFAULT 5,
+    CONSTRAINT feed_configuration_pkey PRIMARY KEY (id),
+    CONSTRAINT feed_configuration_single_row CHECK (id = 1)
+);
+
+-- Seed default configuration row
+INSERT INTO public.feed_configuration (id) VALUES (1);
 
 -- ============================================
 -- 5) PRIMARY KEYS

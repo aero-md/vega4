@@ -8,11 +8,6 @@ public class FeedProperties
     public Guid FeedId { get; set; }
     public ulong GuildId { get; set; }
     public ulong ChannelId { get; set; }
-
-    /// <summary>
-    /// Flags for future use
-    /// </summary>
-    public int Params { get; set; }
     public string Topic { get; set; } = "";
     public int IntervalInMinutes { get; set;}
 
@@ -20,6 +15,16 @@ public class FeedProperties
     /// Minute of the hour to start the interval at
     /// </summary>
     public int StartAtMinute { get; set;}
+
+    /// <summary>
+    /// Whether NSFW content is allowed for this feed
+    /// </summary>
+    public bool AllowNsfw { get; set; }
+
+    /// <summary>
+    /// Current status of the feed (stored as int in DB for extensibility)
+    /// </summary>
+    public FeedStatus Status { get; set; } = FeedStatus.Active;
 
     public DateTime CreatedAt { get; set; }
 
@@ -31,7 +36,7 @@ public class FeedProperties
         string topic,
         int intervalInMinutes,
         int startAtMinute = -1,
-        int parameters = 0,
+        bool allowNsfw = false,
         DateTime? createdAt = null
     )
     {
@@ -40,7 +45,7 @@ public class FeedProperties
         Topic = topic;
         IntervalInMinutes = intervalInMinutes;
         StartAtMinute = startAtMinute;
-        Params = parameters;
+        AllowNsfw = allowNsfw;
         CreatedAt = createdAt ?? DateTime.UtcNow;
     }
 }

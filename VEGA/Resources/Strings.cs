@@ -21,6 +21,14 @@ public static class Strings
         public const string CommandExecutionCritical = "exceptions.commandExecutionCritical";
         public const string TriggerNotFound = "exceptions.triggerNotFound";
         public const string WaifuApiCallFailed = "exceptions.waifuApiCallFailed";
+        public const string InvalidCategorySelected = "exceptions.invalidCategorySelected";
+        public const string UnimplementedApi = "exceptions.unimplementedApi";
+        public const string ReminderNotFound = "exceptions.reminderNotFound";
+        public const string GuildIdMismatch = "exceptions.guildIdMismatch";
+        public const string FeedLimitReached = "exceptions.feedLimitReached";
+        public const string FeedNotFound = "exceptions.feedNotFound";
+        public const string InvalidFeedIdFormat = "exceptions.invalidFeedIdFormat";
+        public const string FeedConfigInvalidValue = "exceptions.feedConfigInvalidValue";
         public const string NoEmoteInMessage = "exceptions.noEmoteInMessage";
         public const string TooManyEmotesInMessage = "exceptions.tooManyEmotesInMessage";
     }
@@ -43,6 +51,12 @@ public static class Strings
         public const string FeedCreated = "commands.feedCreated";
         public const string ActiveFeedsOnServer = "commands.activeFeedsOnServer";
         public const string FeedDelay = "commands.feedDelay";
+        public const string FeedDeleted = "commands.feedDeleted";
+        public const string FeedStatusActive = "commands.feedStatusActive";
+        public const string FeedStatusChannelDeleted = "commands.feedStatusChannelDeleted";
+        public const string FeedStatusTopicUnavailable = "commands.feedStatusTopicUnavailable";
+        public const string FeedStatusSuspended = "commands.feedStatusSuspended";
+        public const string FeedConfigUpdated = "commands.feedConfigUpdated";
         public const string DlEmotesResultSingle = "commands.dlEmotesResultSingle";
         public const string DlEmotesResultMultiple = "commands.dlEmotesResultMultiple";
         public const string ReminderTimeRequired = "commands.reminderTimeRequired";

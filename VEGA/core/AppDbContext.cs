@@ -23,6 +23,9 @@ public class AppDbContext : DbContext
     private const string FEED_HISTORY_TABLE_NAME = "feeds_recent_posts";
     public DbSet<FeedPostReceit> FeedHistory { get; set; }
 
+    // Feed system configuration (single-row)
+    public DbSet<FeedConfiguration> FeedConfiguration { get; set; }
+
 
     private VegaConfiguration _config { get; }
 
@@ -85,10 +88,19 @@ public class AppDbContext : DbContext
                     .Property(t => t.FeedId)
                     .HasDefaultValueSql("gen_random_uuid()")  // Default value : new Guid 
                     .ValueGeneratedOnAdd();
+
+        // Map FeedStatus enum to int column
+        modelBuilder.Entity<FeedProperties>()
+                    .Property(t => t.Status)
+                    .HasConversion<int>();
         
         // Define FeedHistoryPost composite key (FeedId + PostId)
         modelBuilder.Entity<FeedPostReceit>()
                     .ToTable("feeds_recent_posts") // Set custom table name
                     .HasKey(t => new { t.FeedId, t.PostId });
+
+        // Feed configuration single-row table
+        modelBuilder.Entity<FeedConfiguration>()
+                    .ToTable("feed_configuration");
     }
 }

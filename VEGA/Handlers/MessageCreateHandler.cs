@@ -1,11 +1,11 @@
 using static Core.GlobalRegistry;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using NetCord.Gateway;
 using NetCord.Rest;
 using Models.Entities;
 using System.Text.RegularExpressions;
 using Services;
+using Serilog;
 
 namespace Handlers;
 
@@ -37,17 +37,13 @@ public static class MessageCreateHandler
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Cannot send trigger response :", ex.Message);
+                        Log.Error(ex, "Failed to send response to trigger {0} in server {1}", trigger?.TriggerId, message.GuildId);
                     }
                 }
             }
         }
 
         stopwatch.Stop();
-
-        #if DEBUG
-        Console.WriteLine("MessageCreate handled in {0} ms", stopwatch.ElapsedMilliseconds);
-        #endif
     }
 
     private static Trigger? checkTriggers(Message msg, GuildSettings settings){

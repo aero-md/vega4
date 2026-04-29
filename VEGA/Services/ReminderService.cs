@@ -4,6 +4,7 @@ using Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Models.Entities;
 using NetCord;
+using Resources;
 using NetCord.Rest;
 using static Core.GlobalRegistry;
 
@@ -76,7 +77,7 @@ public class ReminderService
 
         if (reminder == null)
         {
-            throw new SlashCommandBusinessException("Reminder not found");
+            throw new SlashCommandBusinessException(Strings.Exceptions.ReminderNotFound);
         }
 
         _dbContext.Reminders.Remove(reminder);
@@ -124,7 +125,7 @@ public class ReminderService
 
         if (reminder == null)
         {
-            throw new SlashCommandBusinessException("Reminder not found");
+            throw new SlashCommandBusinessException(Strings.Exceptions.ReminderNotFound);
         }
 
         // Cancel existing timer
