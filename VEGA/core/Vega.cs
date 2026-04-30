@@ -1,8 +1,10 @@
 using static Core.GlobalRegistry;
+using System.Reflection;
 using NetCord;
 using NetCord.Gateway;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
+using NetCord.Services.ComponentInteractions;
 using NetCord.Logging;
 using Handlers;
 
@@ -14,6 +16,7 @@ public class Vega
     private ShardedGatewayClient ShardedClient { get; set; } = null!;
     // Initialize the command service so the property is non-null after construction
     private ApplicationCommandService<ApplicationCommandContext> ApplicationCommandService { get; set; } = null!;
+    private ComponentInteractionService<ButtonInteractionContext> ButtonInteractionService { get; set; } = null!;
     
     // Public access to the RestClient from ShardedGatewayClient
     public RestClient Rest => ShardedClient.Rest;
@@ -41,6 +44,12 @@ public class Vega
                                                         .DiscoverCommands()
                                                         .BuildAsync(ShardedClient);
 
+        // Discover [ComponentInteraction] modules in this assembly. No remote
+        // registration needed — Discord identifies handlers by customId at click
+        // time, not at startup like slash commands.
+        ButtonInteractionService = new ComponentInteractionService<ButtonInteractionContext>();
+        ButtonInteractionService.AddModules(Assembly.GetExecutingAssembly());
+
         // Misc Handlers (static)
         ShardedClient.Connecting += (client) =>
         {
@@ -60,6 +69,11 @@ public class Vega
                 // Command Interaction
                 case ApplicationCommandInteraction cmdInteraction:
                     await CommandInteractionHandler.HandleCommand(client, ApplicationCommandService, cmdInteraction);
+                    break;
+
+                // Component Interaction (button clicks, select menus, etc.)
+                case MessageComponentInteraction componentInteraction:
+                    await ComponentInteractionHandler.HandleAsync(client, ButtonInteractionService, componentInteraction);
                     break;
 
                 // Unsupported interaction type

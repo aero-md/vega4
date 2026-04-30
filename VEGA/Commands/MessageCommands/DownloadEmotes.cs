@@ -19,8 +19,14 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
 {
     public const int MAX_EMOTES = 20;
     public const string EMOTE_ZIPFILE_NAME = "emotes.zip";
-    public const string CUSTOMID_ZIP_PREFIX = "dl_emotes:zip:";
-    public const string CUSTOMID_ADD_PREFIX = "dl_emotes:add:";
+
+    // Custom-id prefixes for the widget buttons. The trailing widgetId is appended
+    // with CUSTOMID_SEPARATOR; NetCord's ComponentInteractionService matches the
+    // prefix and binds the remaining segment as a string parameter.
+    public const string CUSTOMID_ZIP_PREFIX = "dl_emotes:zip";
+    public const string CUSTOMID_ADD_PREFIX = "dl_emotes:add";
+    public const char CUSTOMID_SEPARATOR = ':';
+
     public const string CACHE_KEY_PREFIX = "dl_emotes:";
     private const int WIDGET_CACHE_TTL_MINUTES = 10;
 
@@ -63,12 +69,12 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
                     new ActionRowProperties(new IActionRowComponentProperties[]
                     {
                         new ButtonProperties(
-                            CUSTOMID_ZIP_PREFIX + widgetId,
+                            $"{CUSTOMID_ZIP_PREFIX}{CUSTOMID_SEPARATOR}{widgetId}",
                             ResourceHelper.GetString(Strings.Commands.DlEmotesBtnZip, locale),
                             ButtonStyle.Primary
                         ),
                         new ButtonProperties(
-                            CUSTOMID_ADD_PREFIX + widgetId,
+                            $"{CUSTOMID_ADD_PREFIX}{CUSTOMID_SEPARATOR}{widgetId}",
                             ResourceHelper.GetString(Strings.Commands.DlEmotesBtnAdd, locale),
                             ButtonStyle.Success
                         )
@@ -146,6 +152,28 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
         }
         memoryStream.Seek(0, SeekOrigin.Begin);
         return memoryStream;
+    }
+
+    /// <summary>
+    /// Resolves a widgetId back to its cached state. Throws a business exception
+    /// if the cache entry has expired (TTL elapsed since the widget was posted).
+    /// </summary>
+    public static EmoteWidgetState LoadWidgetState(string widgetId)
+    {
+        var cache = MainServiceProvider.GetRequiredService<IMemoryCache>();
+        if (!cache.TryGetValue(CACHE_KEY_PREFIX + widgetId, out EmoteWidgetState? state) || state == null)
+            throw new SlashCommandBusinessException(Strings.Exceptions.DlEmotesWidgetExpired);
+
+        return state;
+    }
+
+    /// <summary>
+    /// Rejects clicks coming from a user other than the one who created the widget.
+    /// </summary>
+    public static void EnsureInvoker(MessageComponentInteraction interaction, EmoteWidgetState state)
+    {
+        if (interaction.User.Id != state.InvokerId)
+            throw new SlashCommandBusinessException(Strings.Exceptions.DlEmotesNotInvoker);
     }
 
     /// <summary>
