@@ -62,6 +62,11 @@ var serviceProvider = new ServiceCollection()
                             .AddHttpClient(HttpClientNames.AnimeImages)
                             .AddPolicyHandler(retryPolicy)
                             .Services
+                            .AddHttpClient(HttpClientNames.Emotes, client =>
+                            {
+                                client.MaxResponseContentBufferSize = HttpClientNames.EmoteMaxResponseBytes;
+                            })
+                            .Services
                             // Feeds services
                             .AddSingleton<FeedContentService>()
                             .AddSingleton<FeedService>()

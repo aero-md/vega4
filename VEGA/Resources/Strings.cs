@@ -20,6 +20,7 @@ public static class Strings
         public const string CommandExecutionFailed = "exceptions.commandExecutionFailed";
         public const string CommandExecutionCritical = "exceptions.commandExecutionCritical";
         public const string TriggerNotFound = "exceptions.triggerNotFound";
+        public const string InvalidRegexPattern = "exceptions.invalidRegexPattern";
         public const string WaifuApiCallFailed = "exceptions.waifuApiCallFailed";
         public const string InvalidCategorySelected = "exceptions.invalidCategorySelected";
         public const string UnimplementedApi = "exceptions.unimplementedApi";
@@ -31,6 +32,12 @@ public static class Strings
         public const string FeedConfigInvalidValue = "exceptions.feedConfigInvalidValue";
         public const string NoEmoteInMessage = "exceptions.noEmoteInMessage";
         public const string TooManyEmotesInMessage = "exceptions.tooManyEmotesInMessage";
+        public const string DlEmotesWidgetExpired = "exceptions.dlEmotesWidgetExpired";
+        public const string DlEmotesNotInGuild = "exceptions.dlEmotesNotInGuild";
+        public const string DlEmotesBotMissingEmojiPerm = "exceptions.dlEmotesBotMissingEmojiPerm";
+        public const string DlEmotesUserMissingEmojiPerm = "exceptions.dlEmotesUserMissingEmojiPerm";
+        public const string DlEmotesNotInvoker = "exceptions.dlEmotesNotInvoker";
+        public const string DlEmotesAddFailed = "exceptions.dlEmotesAddFailed";
     }
 
     public static class Commands
@@ -59,6 +66,12 @@ public static class Strings
         public const string FeedConfigUpdated = "commands.feedConfigUpdated";
         public const string DlEmotesResultSingle = "commands.dlEmotesResultSingle";
         public const string DlEmotesResultMultiple = "commands.dlEmotesResultMultiple";
+        public const string DlEmotesWidgetSingle = "commands.dlEmotesWidgetSingle";
+        public const string DlEmotesWidgetMultiple = "commands.dlEmotesWidgetMultiple";
+        public const string DlEmotesBtnZip = "commands.dlEmotesBtnZip";
+        public const string DlEmotesBtnAdd = "commands.dlEmotesBtnAdd";
+        public const string DlEmotesAddedAll = "commands.dlEmotesAddedAll";
+        public const string DlEmotesAddedPartial = "commands.dlEmotesAddedPartial";
         public const string ReminderTimeRequired = "commands.reminderTimeRequired";
         public const string ReminderInvalidTime = "commands.reminderInvalidTime";
         public const string ReminderSet = "commands.reminderSet";

@@ -1,5 +1,7 @@
 using static Core.GlobalRegistry;
+using Core;
 using Microsoft.Extensions.DependencyInjection;
+using NetCord;
 using NetCord.Gateway;
 using NetCord.Rest;
 using Models.Entities;
@@ -31,9 +33,21 @@ public static class MessageCreateHandler
                     try
                     {
                         if (trigger.PingOnReply)
-                            await message.Channel.SendMessageAsync(trigger.Response);
+                        {
+                            await message.Channel.SendMessageAsync(new MessageProperties
+                            {
+                                Content = trigger.Response,
+                                AllowedMentions = AllowedMentionsProperties.None
+                            });
+                        }
                         else
-                            await message.ReplyAsync(trigger.Response);
+                        {
+                            await message.ReplyAsync(new ReplyMessageProperties
+                            {
+                                Content = trigger.Response,
+                                AllowedMentions = AllowedMentionsProperties.None
+                            });
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -47,21 +61,32 @@ public static class MessageCreateHandler
     }
 
     private static Trigger? checkTriggers(Message msg, GuildSettings settings){
-        Trigger foundPattern;
-
         // Find if the message matches any trigger pattern
         for (var i = 0; i < settings.Triggers.Count; i++) {
             var pattern = settings.Triggers[i];
             try {
-                if (Regex.IsMatch(msg.Content, pattern.Pattern, (RegexOptions)pattern.RegexOptions))
+                // Sanitize stored options at evaluation time too: triggers persisted
+                // before the whitelist was introduced may carry forbidden flags.
+                var options = TriggerRegex.Sanitize(pattern.RegexOptions);
+                if (Regex.IsMatch(msg.Content, pattern.Pattern, options, TriggerRegex.Timeout))
                 {
-                    foundPattern = pattern;
-                    return foundPattern;
+                    return pattern;
                 }
-            } 
-            catch (Exception)
+            }
+            catch (RegexMatchTimeoutException ex)
             {
-                
+                Log.Warning(ex, "Regex timeout on trigger {TriggerId} in guild {GuildId} (pattern length {PatternLength})",
+                    pattern.TriggerId, pattern.GuildId, pattern.Pattern.Length);
+            }
+            catch (ArgumentException ex)
+            {
+                Log.Warning(ex, "Invalid regex pattern on trigger {TriggerId} in guild {GuildId}",
+                    pattern.TriggerId, pattern.GuildId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Unexpected error evaluating trigger {TriggerId} in guild {GuildId}",
+                    pattern.TriggerId, pattern.GuildId);
             }
         }
 

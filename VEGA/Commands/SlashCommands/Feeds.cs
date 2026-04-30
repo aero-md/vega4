@@ -28,6 +28,7 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
     [DefferedResponse]
     [SubSlashCommand("list", "Lists all feeds on this server")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
+    [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
     public async Task ListFeeds()
     {
         try
@@ -103,6 +104,7 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
     [DefferedResponse]
     [SubSlashCommand("delete", "Deletes a feed from this server")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
+    [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
     public async Task DeleteFeed(
         [SlashCommandParameter(
             Name = "feedid",
@@ -137,6 +139,7 @@ public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
     [DefferedResponse]
     [SubSlashCommand("create", "Creates a new feed, to regularly send content from a Subreddit, in this channel")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
+    [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
     public async Task CreateNewFeed(
         [SlashCommandParameter(
             Name = "topic",

@@ -1,3 +1,4 @@
+using Core;
 using Core.CustomCommandAttributes;
 using Exceptions;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,7 @@ using Services;
 using Resources;
 using static Core.GlobalRegistry;
 using NetCord.Services.Commands;
+using System.Text.RegularExpressions;
 
 namespace SlashCommands;
 
@@ -103,12 +105,30 @@ public class Triggers : ApplicationCommandModule<ApplicationCommandContext>
             response.Length > RESPONSE_MAX_LENGTH || response.Length < RESPONSE_MIN_LENGTH
         ) throw new SlashCommandBusinessException(Strings.Exceptions.InvalidParams);
 
+        // Reject invalid syntax and obvious ReDoS patterns up front so they
+        // never reach the message-handler hot path.
+        try
+        {
+            TriggerRegex.Validate(regex, regexOptions);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new SlashCommandBusinessException(Strings.Exceptions.InvalidRegexPattern, ex.Message);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            throw new SlashCommandBusinessException(Strings.Exceptions.InvalidRegexPattern, "timeout");
+        }
+
         GuildSettingsService service = MainServiceProvider.GetRequiredService<GuildSettingsService>();
-        var guildId = 
+        var guildId =
             Context.Interaction.GuildId ?? throw new SlashCommandBusinessException(Strings.Exceptions.UnableToRetrieveGuild);
 
+        // Persist only the sanitized options bits — drops Compiled and unknown flags.
+        int sanitizedOptions = (int)TriggerRegex.Sanitize(regexOptions);
+
         // Create and add new trigger
-        Trigger newTrigger = new Trigger(guildId, regex, response, regexOptions);        
+        Trigger newTrigger = new Trigger(guildId, regex, response, sanitizedOptions);
         _ = await service.AddTrigger(guildId, newTrigger);
 
         await Context.Interaction.SendFollowupMessageAsync(

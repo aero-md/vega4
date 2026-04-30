@@ -334,7 +334,8 @@ public class FeedService
                 {
                     await textChannel.SendMessageAsync(new MessageProperties
                     {
-                        Content = content
+                        Content = content,
+                        AllowedMentions = AllowedMentionsProperties.None
                     });
 
                     _logger.LogInformation("Posted {PostId} to channel {ChannelId} for r/{Subreddit}", 
