@@ -20,9 +20,6 @@
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="feedconfig.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <EmbeddedResource Include="Resources\eng.res.json" />
     <EmbeddedResource Include="Resources\fr.res.json" />
     <PackageReference Include="NetCord.Hosting.AspNetCore" Version="1.0.0-alpha.446" />
