@@ -10,6 +10,12 @@ using Serilog;
 using Polly;
 using Polly.Extensions.Http;
 
+// VEGA's schema uses `timestamp without time zone` columns (see database/migrations).
+// Opt into Npgsql's legacy timestamp behavior so EF maps DateTime -> `timestamp` (not
+// `timestamptz`) and tolerates Kind=Unspecified values read back from those columns.
+// Must run before any Npgsql type mapping is resolved.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 // Configuration
 IConfiguration appSettings = new ConfigurationBuilder()
                                     .AddJsonFile("appsettings.json")
@@ -70,6 +76,8 @@ var serviceProvider = new ServiceCollection()
                             // Feeds services
                             .AddSingleton<FeedContentService>()
                             .AddSingleton<FeedService>()
+                            // Poll service
+                            .AddSingleton<PollService>()
                             // Reminder service
                             //.AddSingleton<ReminderService>()
                             // Scoped
@@ -93,6 +101,10 @@ await vega.Initialize(configuration.BotToken);
 // Initialize FeedService now that Vega (and its RestClient) is ready
 var feedService = serviceProvider.GetRequiredService<FeedService>();
 await feedService.Initialize(vega.Rest);
+
+// Initialize PollService now that Vega (and its RestClient) is ready
+var pollService = serviceProvider.GetRequiredService<PollService>();
+await pollService.Initialize(vega.Rest);
 
 // Initialize ReminderService now that Vega (and its RestClient) is ready
 //var reminderService = serviceProvider.GetRequiredService<ReminderService>();

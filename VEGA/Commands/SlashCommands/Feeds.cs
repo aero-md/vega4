@@ -1,6 +1,4 @@
 using static Core.GlobalRegistry;
-using Exceptions;
-using Models.Entities;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services;
@@ -8,196 +6,60 @@ using NetCord.Services.ApplicationCommands;
 using Microsoft.Extensions.DependencyInjection;
 using Services;
 using Core.CustomCommandAttributes;
-using Resources;
+using ComponentCommands;
 
 namespace SlashCommands;
 
 [SlashCommand("feed", "Manage feeds for this server")]
-public class Feeds :  ApplicationCommandModule<ApplicationCommandContext>
+public class Feeds : ApplicationCommandModule<ApplicationCommandContext>
 {
-    const int TOPIC_LENGTH_MAX = 21;
-    const int TOPIC_LENGTH_MIN = 2;
-    const int INTERVAL_IN_MINUTES_MAX = 1440;
-    const int INTERVAL_IN_MINUTES_MIN = 15;
-    const int START_AT_MINUTE_MIN = 0;
-    const int START_AT_MINUTE_MAX = 59;
-
-    private readonly FeedService _feedService = MainServiceProvider.GetRequiredService<FeedService>();
-
-
+    // Creating and deleting feeds is handled through the /feed list widget
+    // (➕ Add → modal, 🗑️ Delete → select menu + confirm), see FeedWidgetButtons /
+    // FeedDeleteMenu / FeedAddModal. Those flows refresh this very message in place.
     [DefferedResponse]
-    [SubSlashCommand("list", "Lists all feeds on this server")]
+    [SubSlashCommand("list", "List feeds on this server, and add or delete them")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
     public async Task ListFeeds()
     {
-        try
+        var feedService = MainServiceProvider.GetRequiredService<FeedService>();
+        // Ascending so newly-added feeds append at the bottom of the list.
+        var feeds = (await feedService.GetFeedsAsync(Context.Interaction.Guild!.Id))
+            .OrderBy(f => f.CreatedAt)
+            .ToList();
+        var locale = Context.Interaction.UserLocale;
+
+        await Context.Interaction.SendFollowupMessageAsync(new InteractionMessageProperties
         {
-            // Retrieve all feeds for current guild (including inactive)
-            List<FeedProperties> feeds = await _feedService.GetFeedsAsync(Context.Interaction.Guild!.Id);
-
-            if (feeds.Count == 0)
-            {
-                throw new SlashCommandBusinessException(Strings.Commands.NoActiveFeedsOnServer);
-            }
-            else
-            {
-                var fields = new List<EmbedFieldProperties>();
-
-                var embed = new EmbedProperties
-                {
-                    Title = ResourceHelper.GetString(Strings.Commands.ActiveFeedsOnServer, Context.Interaction.UserLocale),
-                };
-
-                foreach (var feed in feeds)
-                {
-                    var nsfwIndicator = feed.AllowNsfw ? " 🔞" : "";
-                    var statusText = GetFeedStatusText(feed.Status, Context.Interaction.UserLocale);
-                    var field = new EmbedFieldProperties
-                    {
-                        Name = $"r/{feed.Topic}{nsfwIndicator}",
-                        Value = $"ID: `{feed.FeedId}`\n" 
-                            + ResourceHelper.GetString(
-                                Strings.Commands.FeedDelay,
-                                Context.Interaction.UserLocale,
-                                feed.IntervalInMinutes
-                            ) 
-                            + $"\n{statusText}"
-                    };
-                    fields.Add(field);
-                }
-
-                if (fields.Count > 0)
-                    embed.Fields = fields;
-
-                await Context.Interaction.SendFollowupMessageAsync(
-                    new InteractionMessageProperties
-                    {
-                        Embeds = new[] { embed }
-                    }
-                );
-            }
-        }
-        catch (SlashCommandBusinessException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new SlashCommandGenericException(ex.Message);
-        }
+            Embeds = new[] { FeedListView.BuildEmbed(feeds, locale) },
+            Components = FeedListView.BuildComponents(feeds, locale)
+        });
     }
 
-    private static string GetFeedStatusText(FeedStatus status, string? locale)
-    {
-        var loc = locale ?? "en-US";
-        return status switch
-        {
-            FeedStatus.Active => ResourceHelper.GetString(Strings.Commands.FeedStatusActive, loc),
-            FeedStatus.ChannelDeleted => ResourceHelper.GetString(Strings.Commands.FeedStatusChannelDeleted, loc),
-            FeedStatus.TopicUnavailable => ResourceHelper.GetString(Strings.Commands.FeedStatusTopicUnavailable, loc),
-            FeedStatus.Suspended => ResourceHelper.GetString(Strings.Commands.FeedStatusSuspended, loc),
-            _ => status.ToString()
-        };
-    }
-
-    [DefferedResponse]
-    [SubSlashCommand("delete", "Deletes a feed from this server")]
+    // Shortcut: open the add form directly (same modal as the /feed list ➕ button).
+    // No [DefferedResponse]: a modal must be the immediate interaction response.
+    [SubSlashCommand("add", "Add a feed (opens a form)")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
-    public async Task DeleteFeed(
-        [SlashCommandParameter(
-            Name = "feedid",
-            Description = "UUID of the feed to delete (use /feed list to see IDs)"
-        )]
-        string feedIdString
-    )
+    public async Task Add()
     {
-        try
-        {
-            if (!Guid.TryParse(feedIdString, out var feedId))
-            {
-                throw new SlashCommandBusinessException(Strings.Exceptions.InvalidFeedIdFormat);
-            }
-
-            await _feedService.RemoveFeedAsync(Context.Interaction.Guild!.Id, feedId);
-
-            await Context.Interaction.SendFollowupMessageAsync(
-                ResourceHelper.GetString(Strings.Commands.FeedDeleted, Context.Interaction.UserLocale)
-            );
-        }
-        catch (SlashCommandBusinessException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new SlashCommandGenericException(ex.Message);
-        }
+        var locale = Context.Interaction.UserLocale ?? "en-US";
+        await Context.Interaction.SendResponseAsync(
+            InteractionCallback.Modal(FeedWidgetButtons.BuildAddModal(FeedWidgetButtons.NO_LIST, locale)));
     }
 
-    [DefferedResponse]
-    [SubSlashCommand("create", "Creates a new feed, to regularly send content from a Subreddit, in this channel")]
+    // Shortcut: open the delete picker directly (same select menu as the 🗑️ button).
+    [SubSlashCommand("delete", "Delete a feed (opens a picker)")]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.ManageMessages)]
-    public async Task CreateNewFeed(
-        [SlashCommandParameter(
-            Name = "topic",
-            Description = "Subreddit's name (without r/)",
-            MaxLength = TOPIC_LENGTH_MAX,
-            MinLength = TOPIC_LENGTH_MIN
-        )]
-        string topic,
-        [SlashCommandParameter(
-            Name = "interval",
-            Description = "Interval in minutes between posts",
-            MaxValue = INTERVAL_IN_MINUTES_MAX,
-            MinValue = INTERVAL_IN_MINUTES_MIN
-        )]
-        int intervalInMinutes,
-        [SlashCommandParameter(
-            Name = "start_at",
-            Description = "Minute of the hour to start posting (0-59)",
-            MaxValue = START_AT_MINUTE_MAX,
-            MinValue = START_AT_MINUTE_MIN
-        )]
-        int startAtMinute = -1,
-        [SlashCommandParameter(
-            Name = "allow_nsfw",
-            Description = "Allow NSFW content"
-        )]
-        bool allowNsfw = false
-    )
+    public async Task Delete()
     {
-        try
-        {
-            await _feedService.CreateNewFeedAsync(
-                new FeedProperties(
-                    Context.Interaction.Guild!.Id,
-                    Context.Interaction.Channel.Id,
-                    topic,
-                    intervalInMinutes,
-                    startAtMinute,
-                    allowNsfw
-                )
-            );
+        var locale = Context.Interaction.UserLocale ?? "en-US";
+        var feedService = MainServiceProvider.GetRequiredService<FeedService>();
+        var feeds = await feedService.GetFeedsAsync(Context.Interaction.Guild!.Id);
 
-            await Context.Interaction.SendFollowupMessageAsync(
-                ResourceHelper.GetString(Strings.Commands.FeedCreated, Context.Interaction.UserLocale, topic)
-            );
-        }
-        catch (SlashCommandBusinessException)
-        {
-            throw;
-        }
-        catch (ArgumentException ex)
-        {
-            // Validation errors from FeedContentService.ValidateSubreddit
-            throw new SlashCommandBusinessException(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            throw new SlashCommandGenericException(ex.Message);
-        }
+        await Context.Interaction.SendResponseAsync(
+            InteractionCallback.Message(
+                FeedWidgetButtons.BuildDeleteMenuMessage(feeds, FeedWidgetButtons.NO_LIST, locale)));
     }
 }

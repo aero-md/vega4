@@ -23,8 +23,10 @@ public class DownloadEmotes : ApplicationCommandModule<ApplicationCommandContext
     // Custom-id prefixes for the widget buttons. The trailing widgetId is appended
     // with CUSTOMID_SEPARATOR; NetCord's ComponentInteractionService matches the
     // prefix and binds the remaining segment as a string parameter.
-    public const string CUSTOMID_ZIP_PREFIX = "dl_emotes:zip";
-    public const string CUSTOMID_ADD_PREFIX = "dl_emotes:add";
+    // The prefix must NOT contain CUSTOMID_SEPARATOR (':'), NetCord's parameter
+    // separator, otherwise AddModules throws InvalidDefinitionException.
+    public const string CUSTOMID_ZIP_PREFIX = "dlemotes_zip";
+    public const string CUSTOMID_ADD_PREFIX = "dlemotes_add";
     public const char CUSTOMID_SEPARATOR = ':';
 
     public const string CACHE_KEY_PREFIX = "dl_emotes:";

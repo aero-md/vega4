@@ -15,6 +15,10 @@ public class AppDbContext : DbContext
     // Reminders
     //public DbSet<Reminder> Reminders { get; set; }
 
+    // Polls
+    public DbSet<Poll> Polls { get; set; }
+    public DbSet<PollVote> PollVotes { get; set; }
+
     // Feeds properties
     private const string FEED_TABLE_NAME = "feeds";
     public DbSet<FeedProperties> FeedProperties { get; set; }
@@ -78,6 +82,23 @@ public class AppDbContext : DbContext
                     .ValueGeneratedOnAdd();
         */
         
+        // Poll PK + Guid default
+        modelBuilder.Entity<Poll>()
+                    .HasKey(p => p.PollId);
+        modelBuilder.Entity<Poll>()
+                    .Property(p => p.PollId)
+                    .HasDefaultValueSql("gen_random_uuid()")
+                    .ValueGeneratedOnAdd();
+
+        // PollVote composite PK and FK to Poll (cascade delete keeps orphan votes from sticking around)
+        modelBuilder.Entity<PollVote>()
+                    .HasKey(v => new { v.PollId, v.UserId });
+        modelBuilder.Entity<PollVote>()
+                    .HasOne<Poll>()
+                    .WithMany()
+                    .HasForeignKey(v => v.PollId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
         // Define FeedProperties entityId with explicit column name
         modelBuilder.Entity<FeedProperties>()
                     .ToTable("feeds") // Set custom table name

@@ -10,7 +10,7 @@ namespace Models.Entities;
 /// </summary>
 public partial class FeedConfiguration
 {
-    private static readonly string[] ValidSortModes = ["hot", "new", "top", "rising"];
+    private static readonly string[] ValidSortModes = ["hot", "new", "rising", "top"];
     private static readonly Regex SubredditRegex = GenerateSubredditRegex();
 
     /// <summary>

@@ -17,6 +17,8 @@ public class Vega
     // Initialize the command service so the property is non-null after construction
     private ApplicationCommandService<ApplicationCommandContext> ApplicationCommandService { get; set; } = null!;
     private ComponentInteractionService<ButtonInteractionContext> ButtonInteractionService { get; set; } = null!;
+    private ComponentInteractionService<StringMenuInteractionContext> StringMenuInteractionService { get; set; } = null!;
+    private ComponentInteractionService<ModalInteractionContext> ModalInteractionService { get; set; } = null!;
     
     // Public access to the RestClient from ShardedGatewayClient
     public RestClient Rest => ShardedClient.Rest;
@@ -50,6 +52,15 @@ public class Vega
         ButtonInteractionService = new ComponentInteractionService<ButtonInteractionContext>();
         ButtonInteractionService.AddModules(Assembly.GetExecutingAssembly());
 
+        // String select menus get their own service+context (AddModules only picks up
+        // modules whose context matches). Routed alongside buttons in InteractionCreate.
+        StringMenuInteractionService = new ComponentInteractionService<StringMenuInteractionContext>();
+        StringMenuInteractionService.AddModules(Assembly.GetExecutingAssembly());
+
+        // Modal submissions (e.g. /trigger add) get their own service+context.
+        ModalInteractionService = new ComponentInteractionService<ModalInteractionContext>();
+        ModalInteractionService.AddModules(Assembly.GetExecutingAssembly());
+
         // Misc Handlers (static)
         ShardedClient.Connecting += (client) =>
         {
@@ -71,9 +82,19 @@ public class Vega
                     await CommandInteractionHandler.HandleCommand(client, ApplicationCommandService, cmdInteraction);
                     break;
 
-                // Component Interaction (button clicks, select menus, etc.)
+                // String select menus (more specific than MessageComponentInteraction, so listed first)
+                case StringMenuInteraction stringMenuInteraction:
+                    await ComponentInteractionHandler.HandleAsync(client, StringMenuInteractionService, stringMenuInteraction);
+                    break;
+
+                // Component Interaction (button clicks, etc.)
                 case MessageComponentInteraction componentInteraction:
                     await ComponentInteractionHandler.HandleAsync(client, ButtonInteractionService, componentInteraction);
+                    break;
+
+                // Modal submissions (e.g. /trigger add form)
+                case ModalInteraction modalInteraction:
+                    await ComponentInteractionHandler.HandleAsync(client, ModalInteractionService, modalInteraction);
                     break;
 
                 // Unsupported interaction type

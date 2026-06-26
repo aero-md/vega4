@@ -16,6 +16,8 @@ namespace Services;
 public class FeedContentService
 {
     private const string REDDIT_POSTS_URL_TEMPLATE = "https://api.reddit.com/r/{0}/{1}.json?limit={2}";
+    // `top` (and `controversial`) are time-windowed via Reddit's `t` param; we use the weekly top.
+    private const string REDDIT_TOP_TIME_WINDOW = "week";
     private const string REDDIT_POST_URL_TEMPLATE = "https://reddit.com{0}";
     private const string REDDIT_IMAGE_URL_TEMPLATE = "https://i.redd.it/{0}.{1}";
 
@@ -116,7 +118,11 @@ public class FeedContentService
         var httpClient = _httpClientFactory.CreateClient(HttpClientNames.Reddit);
         var sort = config.SortMode.ToLowerInvariant();
         var url = string.Format(REDDIT_POSTS_URL_TEMPLATE, subreddit, sort, config.FetchSize);
-        
+
+        // `top` is time-windowed; without `t` Reddit defaults to all-time. We want the weekly top.
+        if (sort == "top")
+            url += $"&t={REDDIT_TOP_TIME_WINDOW}";
+
         var response = await httpClient.GetAsync(url);
 
         // Let 403/404 propagate as HttpRequestException with StatusCode

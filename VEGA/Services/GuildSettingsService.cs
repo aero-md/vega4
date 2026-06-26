@@ -145,30 +145,22 @@ public class GuildSettingsService
 
 
     /// <summary>
-    /// Delete a trigger on the targeted GuildSettings. Returns the deleted trigger's pattern.
+    /// Delete a trigger by its UUID on the targeted GuildSettings. Returns the deleted
+    /// trigger's pattern, or null if no trigger with that id exists on the guild.
+    /// Deletion is keyed on the stable TriggerId (no fragile positional index).
     /// </summary>
-    /// <param name="guildId"></param>
-    /// <param name="trigger"></param>
-    /// <returns></returns>
-    public async Task<string?> DeleteTrigger(ulong guildId, int triggerIndex)
+    public async Task<string?> DeleteTrigger(ulong guildId, Guid triggerId)
     {
         GuildSettings settings = await GetByIdAsync(guildId);
 
-        if (settings.Triggers.Count == 0)
-            throw new SlashCommandBusinessException($"There are no triggers on this server");
-        
-        Trigger trigger = settings.Triggers.OrderByDescending(x => x.CreatedAt)
-                                           .ToList()
-                                           .ElementAt(triggerIndex);
-
-        Guid? id = trigger?.TriggerId;
-        string? pattern = trigger?.Pattern;
-        
-        if (id == null)
+        Trigger? trigger = settings.Triggers.FirstOrDefault(t => t.TriggerId == triggerId);
+        if (trigger == null)
             return null;
 
-        settings.Triggers.RemoveAll(x => x.TriggerId == id);
-        GuildSettings updatedSettings = await SaveOrUpdateAsync(guildId, settings);
+        string pattern = trigger.Pattern;
+
+        settings.Triggers.RemoveAll(x => x.TriggerId == triggerId);
+        await SaveOrUpdateAsync(guildId, settings);
 
         return pattern;
     }

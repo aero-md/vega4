@@ -38,6 +38,9 @@ public static class Strings
         public const string DlEmotesUserMissingEmojiPerm = "exceptions.dlEmotesUserMissingEmojiPerm";
         public const string DlEmotesNotInvoker = "exceptions.dlEmotesNotInvoker";
         public const string DlEmotesAddFailed = "exceptions.dlEmotesAddFailed";
+        public const string PollNotFoundOrEnded = "exceptions.pollNotFoundOrEnded";
+        public const string TriggerManageRequired = "exceptions.triggerManageRequired";
+        public const string FeedManageRequired = "exceptions.feedManageRequired";
     }
 
     public static class Commands
@@ -54,6 +57,18 @@ public static class Strings
         public const string TriggerInfo = "commands.triggerInfo";
         public const string TriggerAdded = "commands.triggerAdded";
         public const string TriggerDeleted = "commands.triggerDeleted";
+        public const string TriggerBtnDelete = "commands.triggerBtnDelete";
+        public const string TriggerDeleteMenuPrompt = "commands.triggerDeleteMenuPrompt";
+        public const string TriggerDeleteMenuPlaceholder = "commands.triggerDeleteMenuPlaceholder";
+        public const string TriggerDeleteConfirmPrompt = "commands.triggerDeleteConfirmPrompt";
+        public const string TriggerBtnConfirm = "commands.triggerBtnConfirm";
+        public const string TriggerBtnCancel = "commands.triggerBtnCancel";
+        public const string TriggerDeleteCancelled = "commands.triggerDeleteCancelled";
+        public const string TriggerBtnAdd = "commands.triggerBtnAdd";
+        public const string TriggerAddModalTitle = "commands.triggerAddModalTitle";
+        public const string TriggerAddFieldRegex = "commands.triggerAddFieldRegex";
+        public const string TriggerAddFieldResponse = "commands.triggerAddFieldResponse";
+        public const string TriggerAddFieldOptions = "commands.triggerAddFieldOptions";
         public const string NoActiveFeedsOnServer = "commands.noActiveFeedsOnServer";
         public const string FeedCreated = "commands.feedCreated";
         public const string ActiveFeedsOnServer = "commands.activeFeedsOnServer";
@@ -63,7 +78,19 @@ public static class Strings
         public const string FeedStatusChannelDeleted = "commands.feedStatusChannelDeleted";
         public const string FeedStatusTopicUnavailable = "commands.feedStatusTopicUnavailable";
         public const string FeedStatusSuspended = "commands.feedStatusSuspended";
+        public const string FeedBtnAdd = "commands.feedBtnAdd";
+        public const string FeedBtnDelete = "commands.feedBtnDelete";
+        public const string FeedAddModalTitle = "commands.feedAddModalTitle";
+        public const string FeedAddFieldTopic = "commands.feedAddFieldTopic";
+        public const string FeedAddFieldInterval = "commands.feedAddFieldInterval";
+        public const string FeedAddFieldStartAt = "commands.feedAddFieldStartAt";
+        public const string FeedAddFieldNsfw = "commands.feedAddFieldNsfw";
+        public const string FeedDeleteMenuPrompt = "commands.feedDeleteMenuPrompt";
+        public const string FeedDeleteMenuPlaceholder = "commands.feedDeleteMenuPlaceholder";
+        public const string FeedDeleteConfirmPrompt = "commands.feedDeleteConfirmPrompt";
         public const string FeedConfigUpdated = "commands.feedConfigUpdated";
+        public const string FeedConfigModalTitle = "commands.feedConfigModalTitle";
+        public const string FeedConfigSaved = "commands.feedConfigSaved";
         public const string DlEmotesResultSingle = "commands.dlEmotesResultSingle";
         public const string DlEmotesResultMultiple = "commands.dlEmotesResultMultiple";
         public const string DlEmotesWidgetSingle = "commands.dlEmotesWidgetSingle";
@@ -93,6 +120,20 @@ public static class Strings
         public const string CacheInfoDataLabel = "commands.cacheInfoDataLabel";
         public const string CacheInfoDataValue = "commands.cacheInfoDataValue";
         public const string CacheInfoFooter = "commands.cacheInfoFooter";
+        public const string PollTitle = "commands.pollTitle";
+        public const string PollModalTitle = "commands.pollModalTitle";
+        public const string PollFieldQuestion = "commands.pollFieldQuestion";
+        public const string PollFieldDuration = "commands.pollFieldDuration";
+        public const string PollFieldOptions = "commands.pollFieldOptions";
+        public const string PollFieldImage = "commands.pollFieldImage";
+        public const string PollEndsAt = "commands.pollEndsAt";
+        public const string PollOptionYes = "commands.pollOptionYes";
+        public const string PollOptionNo = "commands.pollOptionNo";
+        public const string PollVoteRegistered = "commands.pollVoteRegistered";
+        public const string PollVoteAlreadyVoted = "commands.pollVoteAlreadyVoted";
+        public const string PollResultsTitle = "commands.pollResultsTitle";
+        public const string PollResultsField = "commands.pollResultsField";
+        public const string PollResultsFooter = "commands.pollResultsFooter";
     }
     
     public static class Logs

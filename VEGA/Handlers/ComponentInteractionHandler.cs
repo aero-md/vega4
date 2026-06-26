@@ -14,32 +14,65 @@ namespace Handlers;
 /// Dispatches message component interactions to the matching method on a
 /// ComponentInteractionService module (decorated with [ComponentInteraction]).
 /// Mirrors the i18n + error-handling pattern of CommandInteractionHandler;
-/// each module method is responsible for its own deferred response.
+/// each module method is responsible for its own response (defer, message or modify).
+///
+/// One overload per component context (buttons, string menus, …); they all funnel
+/// into the generic <see cref="DispatchAsync"/> core.
 /// </summary>
 public static class ComponentInteractionHandler
 {
-    public static async Task HandleAsync(
+    public static Task HandleAsync(
         GatewayClient client,
         ComponentInteractionService<ButtonInteractionContext> componentService,
         MessageComponentInteraction interaction)
     {
-        // Today only buttons are wired up. Other component types (select menus,
-        // modals…) would each get their own service+context and a sibling branch.
         if (interaction is not ButtonInteraction buttonInteraction)
         {
             Log.Warning("Unsupported component interaction type: {InteractionType} (customId={CustomId})",
                 interaction.GetType().Name, interaction.Data.CustomId);
-            return;
+            return Task.CompletedTask;
         }
 
-        var customId = interaction.Data.CustomId;
+        return DispatchAsync(
+            componentService,
+            new ButtonInteractionContext(buttonInteraction, client),
+            buttonInteraction,
+            buttonInteraction.Data.CustomId);
+    }
+
+    public static Task HandleAsync(
+        GatewayClient client,
+        ComponentInteractionService<StringMenuInteractionContext> componentService,
+        StringMenuInteraction interaction)
+        => DispatchAsync(
+            componentService,
+            new StringMenuInteractionContext(interaction, client),
+            interaction,
+            interaction.Data.CustomId);
+
+    public static Task HandleAsync(
+        GatewayClient client,
+        ComponentInteractionService<ModalInteractionContext> componentService,
+        ModalInteraction interaction)
+        => DispatchAsync(
+            componentService,
+            new ModalInteractionContext(interaction, client),
+            interaction,
+            interaction.Data.CustomId);
+
+    private static async Task DispatchAsync<TContext>(
+        ComponentInteractionService<TContext> service,
+        TContext context,
+        Interaction interaction,
+        string customId)
+        where TContext : IComponentInteractionContext
+    {
         var locale = interaction.UserLocale;
         string? errorMsg = null;
 
         try
         {
-            var ctx = new ButtonInteractionContext(buttonInteraction, client);
-            IExecutionResult result = await componentService.ExecuteAsync(ctx, MainServiceProvider);
+            IExecutionResult result = await service.ExecuteAsync(context, MainServiceProvider);
 
             switch (result)
             {
@@ -71,10 +104,8 @@ public static class ComponentInteractionHandler
         if (errorMsg == null)
             return;
 
-        // The action method defers as its first step, so a followup is the right
-        // shape after a successful match. Pre-execution failures (NotFound, etc.)
-        // already returned above, so we shouldn't be in the never-deferred case;
-        // if Discord rejects the followup we still log it.
+        // Best-effort ephemeral error. Handlers that already responded get a followup;
+        // if Discord rejects it (e.g. nothing was responded yet) we still log it.
         try
         {
             await interaction.SendFollowupMessageAsync(new InteractionMessageProperties
