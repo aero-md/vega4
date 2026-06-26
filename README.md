@@ -19,6 +19,34 @@ All commands require that users using them have the required persmissions as to 
 
 ## How to use
 
-Requirements : a PostgreSQL Database. *DB scripts or DB project are still to be added to the repo*
+Requirements : a PostgreSQL Database.
 
-Download source, copy `appsettings-exemple.json` to `appsettings.json`, and file it with your Discord bot token and Postgre DB connexion string
+Download source, copy `appsettings-exemple.json` to `appsettings.json`, and file it with your Discord bot token and Postgre DB connexion string.
+
+### Database
+
+The `database/` folder is split in two:
+
+- **`database/createdb.sql`** — one-shot **manual** bootstrap (run as the `postgres` superuser): creates the role, the database and the `public` schema privileges. **Not** played by the deploy runner. Edit the `<DB_NAME>` / `<DB_USER>` / `<DB_PASSWORD>` placeholders first, then:
+  ```bash
+  sudo -u postgres psql -f database/createdb.sql
+  ```
+- **`database/migrations/`** — idempotent schema migrations (`001_core.sql` … `004_reminders.sql`), applied in lexicographic order. Each uses `CREATE ... IF NOT EXISTS`, so the runner is safe to replay on every deploy. Types match the deployed schema (`timestamp`, `varchar(n)`, …).
+
+Apply the migrations with `scripts/migrate.sh` (uses `psql`, reads `postgres.connexionString` from `appsettings.json`):
+
+```bash
+bash scripts/migrate.sh
+```
+
+### Deploy (Raspberry Pi)
+
+`deploy.ps1` publishes a self-contained `linux-arm64` binary, ships it over SSH, runs the migrations, then restarts the systemd service:
+
+```powershell
+.\deploy.ps1                 # publish + deploy + migrate + restart
+.\deploy.ps1 -SkipMigrate    # skip migrations
+.\deploy.ps1 -SkipBuild      # deploy an already-published binary
+```
+
+`appsettings.json` (secrets) on the Pi is never overwritten by a deploy.

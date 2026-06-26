@@ -5,3 +5,6 @@ VEGA.Tests/obj/*
 .vscode/*
 appsettings.json
 appsettings.test.json
+
+# Déploiement : contient hôte SSH / chemins réels. Versionner deploy.example.ps1 à la place.
+deploy.ps1
