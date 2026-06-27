@@ -1,26 +1,19 @@
-using Microsoft.Extensions.Logging;
+using static Core.GlobalRegistry;
+using Core;
 using Microsoft.Extensions.DependencyInjection;
+using NetCord;
 using NetCord.Gateway;
 using NetCord.Rest;
-using static Core.GlobalRegistry;
 using Models.Entities;
 using System.Text.RegularExpressions;
+using Services;
+using Serilog;
 
 namespace Handlers;
 
-public class MessageCreateHandler
+public static class MessageCreateHandler
 {
-    //private readonly ICacheService _cache; // ton cache singleton
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<MessageCreateHandler> _logger;
-
-    public MessageCreateHandler(/*ICacheService cache,*/ ILogger<MessageCreateHandler> logger)
-    {
-        //_cache = cache;
-        _logger = logger;
-    }
-
-    public async Task MessageCreate(GatewayClient client, Message message)
+    public static async Task MessageCreate(GatewayClient client, Message message)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -40,41 +33,60 @@ public class MessageCreateHandler
                     try
                     {
                         if (trigger.PingOnReply)
-                            await message.Channel.SendMessageAsync(trigger.Response);
+                        {
+                            await message.Channel.SendMessageAsync(new MessageProperties
+                            {
+                                Content = trigger.Response,
+                                AllowedMentions = AllowedMentionsProperties.None
+                            });
+                        }
                         else
-                            await message.ReplyAsync(trigger.Response);
+                        {
+                            await message.ReplyAsync(new ReplyMessageProperties
+                            {
+                                Content = trigger.Response,
+                                AllowedMentions = AllowedMentionsProperties.None
+                            });
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Cannot send trigger response :", ex.Message);
+                        Log.Error(ex, "Failed to send response to trigger {0} in server {1}", trigger?.TriggerId, message.GuildId);
                     }
                 }
             }
         }
 
         stopwatch.Stop();
-
-        #if DEBUG
-        Console.WriteLine("MessageCreate handled in {0} ms", stopwatch.ElapsedMilliseconds);
-        #endif
     }
 
-    private Trigger? checkTriggers(Message msg, GuildSettings settings){
-        Trigger foundPattern;
-
+    private static Trigger? checkTriggers(Message msg, GuildSettings settings){
         // Find if the message matches any trigger pattern
         for (var i = 0; i < settings.Triggers.Count; i++) {
             var pattern = settings.Triggers[i];
             try {
-                if (Regex.IsMatch(msg.Content, pattern.Pattern, (RegexOptions)pattern.RegexOptions))
+                // Sanitize stored options at evaluation time too: triggers persisted
+                // before the whitelist was introduced may carry forbidden flags.
+                var options = TriggerRegex.Sanitize(pattern.RegexOptions);
+                if (Regex.IsMatch(msg.Content, pattern.Pattern, options, TriggerRegex.Timeout))
                 {
-                    foundPattern = pattern;
-                    return foundPattern;
+                    return pattern;
                 }
-            } 
+            }
+            catch (RegexMatchTimeoutException ex)
+            {
+                Log.Warning(ex, "Regex timeout on trigger {TriggerId} in guild {GuildId} (pattern length {PatternLength})",
+                    pattern.TriggerId, pattern.GuildId, pattern.Pattern.Length);
+            }
+            catch (ArgumentException ex)
+            {
+                Log.Warning(ex, "Invalid regex pattern on trigger {TriggerId} in guild {GuildId}",
+                    pattern.TriggerId, pattern.GuildId);
+            }
             catch (Exception ex)
             {
-                
+                Log.Error(ex, "Unexpected error evaluating trigger {TriggerId} in guild {GuildId}",
+                    pattern.TriggerId, pattern.GuildId);
             }
         }
 

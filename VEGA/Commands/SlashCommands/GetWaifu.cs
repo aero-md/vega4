@@ -4,16 +4,22 @@ using NetCord;
 using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
-using Models.CommandSpecificModels;
+using Models.Business;
 using static Core.GlobalRegistry;
-using Services.CommandSpecificServices;
+using Services;
 using Microsoft.Extensions.DependencyInjection;
 using Exceptions;
+using Resources;
+using Core.CustomCommandAttributes;
 
 namespace SlashCommands;
 
 public class GetWaifu : ApplicationCommandModule<ApplicationCommandContext>
 {
+    public const int COUNT_MIN = 1;
+    public const int COUNT_MAX = 5;
+
+    [DefferedResponse]
     [RequireUserPermissions<ApplicationCommandContext>(Permissions.AttachFiles)]
     [RequireBotPermissions<ApplicationCommandContext>(Permissions.AttachFiles)]
     [RequireContext<ApplicationCommandContext>(RequiredContext.Guild)]
@@ -29,9 +35,10 @@ public class GetWaifu : ApplicationCommandModule<ApplicationCommandContext>
         )] int count = 1
     )
     {
-        await Context.Interaction.SendResponseAsync(
-            InteractionCallback.DeferredMessage()
-        );
+        // Don't trust Discord on minmax values validation
+        if (
+            count > COUNT_MAX || count < COUNT_MIN
+        ) throw new SlashCommandBusinessException(Strings.Exceptions.InvalidParams);
 
         var waifuApiService = MainServiceProvider.GetRequiredService<WaifuApiService>();
         
@@ -43,21 +50,15 @@ public class GetWaifu : ApplicationCommandModule<ApplicationCommandContext>
 
             await Context.Interaction.SendFollowupMessageAsync(response);
         }
-        // Business exception, add info that deferred msg exists and pass down exception
-        catch (SlashCommandBusinessException ex)
-        {
-            ex.Deferred = true;
-            throw;
-        }
         // API error : business exception with explicit message
         catch (HttpRequestException httpEx)
         {
-            throw new SlashCommandBusinessException($"The call to the waifu API failed. Code : {httpEx.StatusCode}", true);
+            throw new SlashCommandBusinessException(Strings.Exceptions.WaifuApiCallFailed, httpEx.StatusCode?.ToString() ?? Strings.Misc.Unknown);
         }
         // Other : classic exception
         catch (Exception ex)
         {
-            throw new SlashCommandGenericException(ex.Message, true);
+            throw new SlashCommandGenericException(ex.Message);
         }
     }
 }

@@ -6,13 +6,9 @@ namespace Exceptions;
 /// </summary>
 public abstract class SlashCommandException : Exception
 {
-    public bool Deferred {get; set;}
-
-    protected SlashCommandException(string message, bool deferred) 
+    protected SlashCommandException(string message) 
         : base(message)
-    {
-        Deferred = deferred;
-    }
+    {}
 }
 
 
@@ -21,7 +17,16 @@ public abstract class SlashCommandException : Exception
 /// </summary>
 public class SlashCommandBusinessException : SlashCommandException
 {
-    public SlashCommandBusinessException(string message, bool deferred = false) : base(message, deferred) { }
+    /// <summary>
+    /// Message is a resource key from StringResources.Exceptions
+    /// </summary>
+    /// <param name="message"></param>
+    public object[] Args;
+
+    public SlashCommandBusinessException(string message, params object[] args) : base(message)
+    {
+        Args = args;
+    }
 }
 
 /// <summary>
@@ -29,5 +34,5 @@ public class SlashCommandBusinessException : SlashCommandException
 /// </summary>
 public class SlashCommandGenericException : SlashCommandException
 {
-    public SlashCommandGenericException(string message, bool deferred = false) : base(message, deferred) { }
+    public SlashCommandGenericException(string message) : base(message) { }
 }

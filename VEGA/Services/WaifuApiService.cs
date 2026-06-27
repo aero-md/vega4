@@ -1,12 +1,16 @@
 using System.Text.Json;
+using Core;
 using Exceptions;
 using Microsoft.AspNetCore.WebUtilities;
-using Models.CommandSpecificModels;
+using Models.Business;
+using Resources;
 
-namespace Services.CommandSpecificServices;
+namespace Services;
 
-public class WaifuApiService
+public class WaifuApiService(IHttpClientFactory httpClientFactory)
 {
+    private readonly HttpClient _http = httpClientFactory.CreateClient(HttpClientNames.AnimeImages);
+
     public async Task<List<string>> FetchImagesAsync(int count, int categoryId)
     {
         IApiDefinition apiToFetch;
@@ -20,14 +24,14 @@ public class WaifuApiService
             apiToFetch = matchingApis[apiIndex];
         }
         else 
-            apiToFetch = matchingApis.First() ?? throw new SlashCommandBusinessException("Invalid category selected");
+            apiToFetch = matchingApis.First() ?? throw new SlashCommandBusinessException(Strings.Exceptions.InvalidCategorySelected);
 
         return apiToFetch switch
         {
             WaifuPicsApiReference => await FetchApiWaifuPicAsync(count, categoryId),
             WaifuImApiReference   => await FetchApiWaifuImAsync(count, categoryId),
             NekosiaApiReference   => await FetchApiNekosiaAsync(count, categoryId),
-            _ => throw new SlashCommandBusinessException("Inimplemented API"),
+            _ => throw new SlashCommandBusinessException(Strings.Exceptions.UnimplementedApi),
         };
     }
 
@@ -37,15 +41,14 @@ public class WaifuApiService
         bool multiple = count > 1;
         string categoryValue = apiDefinition.Categories.Single(x => x.Id == categoryId).Value;
 
-        using HttpClient client = new();
         string baseUri = apiDefinition.GetBaseUri(multiple);
         string fullUrl = string.Format(baseUri, "sfw", categoryValue);
-        
+
         List<string> imgUrls = new();
 
         if (multiple)
         {
-            HttpResponseMessage response = await client.PostAsync(
+            HttpResponseMessage response = await _http.PostAsync(
                 fullUrl,
                 // The "exclude" field is required, even when empty
                 new FormUrlEncodedContent(new Dictionary<string, string> {{"exclude", ""}})
@@ -58,7 +61,7 @@ public class WaifuApiService
         }
         else
         {
-            HttpResponseMessage response = await client.GetAsync(fullUrl);
+            HttpResponseMessage response = await _http.GetAsync(fullUrl);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
@@ -75,19 +78,18 @@ public class WaifuApiService
         string categoryValue = apiDefinition.Categories.Single(x => x.Id == categoryId).Value;
         string baseUri = apiDefinition.GetBaseUri();
         
-        using HttpClient client = new HttpClient();
-
         var queryParams = new Dictionary<string, string?>
         {
-            ["is_nsfw"] = false.ToString(),
-            ["included_tags"] = categoryValue,
+            ["IsNsfw"] = false.ToString(),
+            ["IncludedTags"] = categoryValue,
+            ["PageSize"] = count.ToString()
         };
         if (count > 1)
             queryParams.Add("limit", count.ToString());
         
         string fullUrl = QueryHelpers.AddQueryString(baseUri, queryParams);
 
-        HttpResponseMessage response = await client.GetAsync(fullUrl);
+        HttpResponseMessage response = await _http.GetAsync(fullUrl);
         response.EnsureSuccessStatusCode();
 
         string json = await response.Content.ReadAsStringAsync();
@@ -105,8 +107,6 @@ public class WaifuApiService
         string url = string.Format(baseUri, categoryValue);
         bool multiple = count > 1;
         
-        using HttpClient client = new HttpClient();
-
         var queryParams = new Dictionary<string, string?>
         {
             ["rating"] = "safe"
@@ -116,7 +116,7 @@ public class WaifuApiService
         
         string fullUrl = QueryHelpers.AddQueryString(url, queryParams);
 
-        HttpResponseMessage response = await client.GetAsync(fullUrl);
+        HttpResponseMessage response = await _http.GetAsync(fullUrl);
         response.EnsureSuccessStatusCode();
 
         string json = await response.Content.ReadAsStringAsync();

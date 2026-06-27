@@ -1,4 +1,4 @@
-using Core.Models;
+using Models.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Models.Entities;
@@ -8,13 +8,33 @@ namespace Core;
 
 public class AppDbContext : DbContext
 {
+    // Guild settings and triggers
     public DbSet<GuildSettings> GuildSettings { get; set; }
     public DbSet<Trigger> Triggers { get; set; }
 
-    private Configuration _config { get; }
+    // Reminders
+    //public DbSet<Reminder> Reminders { get; set; }
+
+    // Polls
+    public DbSet<Poll> Polls { get; set; }
+    public DbSet<PollVote> PollVotes { get; set; }
+
+    // Feeds properties
+    private const string FEED_TABLE_NAME = "feeds";
+    public DbSet<FeedProperties> FeedProperties { get; set; }
+
+    // Feeds recents posts history
+    private const string FEED_HISTORY_TABLE_NAME = "feeds_recent_posts";
+    public DbSet<FeedPostReceit> FeedHistory { get; set; }
+
+    // Feed system configuration (single-row)
+    public DbSet<FeedConfiguration> FeedConfiguration { get; set; }
 
 
-    public AppDbContext(Configuration config)
+    private VegaConfiguration _config { get; }
+
+
+    public AppDbContext(VegaConfiguration config)
     {
         _config = config;
     }
@@ -27,22 +47,81 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Table names are derived from Entity name, using Snake Case convention
+        /* Table names are derived from Entity name, using Snake Case convention */
+
+        // Define Guidsettings entityId
         modelBuilder.Entity<GuildSettings>()
-                    .HasKey(g => g.GuildId);    // Primary Key
+                    .HasKey(g => g.GuildId);
 
+        // Define Trigger entityId
         modelBuilder.Entity<Trigger>()
-                    .HasKey(t => t.TriggerId);  // Primary Key
+                    .HasKey(t => t.TriggerId);
 
+        // Define TriggerId default value : new GUID
         modelBuilder.Entity<Trigger>()
                     .Property(t => t.TriggerId)
                     .HasDefaultValueSql("gen_random_uuid()")  // Default value : new Guid 
                     .ValueGeneratedOnAdd();
 
+        // Link Triggers to GuildSettings
         modelBuilder.Entity<GuildSettings>()
                     .HasMany(g => g.Triggers)           // Trigger list
                     .WithOne()                          // Navigation property not needed
                     .HasForeignKey(t => t.GuildId)      // Foreign Key
                     .OnDelete(DeleteBehavior.Cascade);  // On delete cascade
+
+        /*
+        // Define Reminder entityId
+        modelBuilder.Entity<Reminder>()
+                    .HasKey(r => r.ReminderId);
+
+        // Define ReminderId default value : new GUID
+        modelBuilder.Entity<Reminder>()
+                    .Property(r => r.ReminderId)
+                    .HasDefaultValueSql("gen_random_uuid()")  // Default value : new Guid 
+                    .ValueGeneratedOnAdd();
+        */
+        
+        // Poll PK + Guid default
+        modelBuilder.Entity<Poll>()
+                    .HasKey(p => p.PollId);
+        modelBuilder.Entity<Poll>()
+                    .Property(p => p.PollId)
+                    .HasDefaultValueSql("gen_random_uuid()")
+                    .ValueGeneratedOnAdd();
+
+        // PollVote composite PK and FK to Poll (cascade delete keeps orphan votes from sticking around)
+        modelBuilder.Entity<PollVote>()
+                    .HasKey(v => new { v.PollId, v.UserId });
+        modelBuilder.Entity<PollVote>()
+                    .HasOne<Poll>()
+                    .WithMany()
+                    .HasForeignKey(v => v.PollId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+        // Define FeedProperties entityId with explicit column name
+        modelBuilder.Entity<FeedProperties>()
+                    .ToTable("feeds") // Set custom table name
+                    .HasKey(t => t.FeedId);
+
+        // Define Feedproperty default value : new GUID
+        modelBuilder.Entity<FeedProperties>()
+                    .Property(t => t.FeedId)
+                    .HasDefaultValueSql("gen_random_uuid()")  // Default value : new Guid 
+                    .ValueGeneratedOnAdd();
+
+        // Map FeedStatus enum to int column
+        modelBuilder.Entity<FeedProperties>()
+                    .Property(t => t.Status)
+                    .HasConversion<int>();
+        
+        // Define FeedHistoryPost composite key (FeedId + PostId)
+        modelBuilder.Entity<FeedPostReceit>()
+                    .ToTable("feeds_recent_posts") // Set custom table name
+                    .HasKey(t => new { t.FeedId, t.PostId });
+
+        // Feed configuration single-row table
+        modelBuilder.Entity<FeedConfiguration>()
+                    .ToTable("feed_configuration");
     }
 }

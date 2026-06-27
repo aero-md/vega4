@@ -4,18 +4,20 @@ using Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Models.Entities;
+using Resources;
 using NetCord.JsonModels;
+
+namespace Services;
 
 public class GuildSettingsService
 {
-    private readonly AppDbContext _dbContext;
-    private readonly IMemoryCache _cache;
-
-    // Consts related to cache
+    // Consts related to cache. TODO : move somes of these to config
     private const int CACHE_LIFETIME_IN_MINUTES = 10;
-    // TODO : move cache lifetime and max triggercount in config
     private const int MAX_TRIGGER_COUNT_BY_GUID = 10;
     private const string CACHE_PREFIX = "guildSettings_";
+
+    private readonly AppDbContext _dbContext;
+    private readonly IMemoryCache _cache;
 
     // Getter to normalize cache key structure
     private string GetCacheKey(ulong guildId) => CACHE_PREFIX + guildId; 
@@ -40,7 +42,8 @@ public class GuildSettingsService
             return cachedSettings!;
 
         var dbSettings = await _dbContext.GuildSettings
-                                    .Include(g => g.Triggers) // Eagerly load Triggers
+                                    .AsNoTracking()  // Keep entities detached so cache doesn't hold tracked entities
+                                    .Include(g => g.Triggers)
                                     .FirstOrDefaultAsync(g => g.GuildId == guildId);
         // Found in BDD
         if (dbSettings != null)
@@ -71,23 +74,50 @@ public class GuildSettingsService
     {
         // Second level validation -> should have been checked a first time in business code
         if (guildId != newSettings.GuildId)
-            throw new SlashCommandBusinessException("GuildId and GuildSettings ID mismatch");
+            throw new SlashCommandBusinessException(Strings.Exceptions.GuildIdMismatch);
 
-        GuildSettings? existingSettings = _dbContext.GuildSettings.Find(guildId);
-        if (existingSettings is null)
+        // Check if the entity already exists in DB (no tracking, just a check)
+        bool exists = await _dbContext.GuildSettings.AnyAsync(g => g.GuildId == guildId);
+
+        if (!exists)
         {
+            // New entity: attach the whole graph as Added
             _dbContext.GuildSettings.Add(newSettings);
         }
         else
         {
-            _dbContext.Entry(existingSettings).CurrentValues.SetValues(newSettings);
-            // Handle triggers separately if needed
+            // Existing entity: attach it so EF tracks it, then handle triggers diff
+            _dbContext.GuildSettings.Update(newSettings);
+
+            // Mark new triggers (default Guid) as Added, existing ones as Modified
+            foreach (var trigger in newSettings.Triggers)
+            {
+                var entry = _dbContext.Entry(trigger);
+                if (trigger.TriggerId == Guid.Empty)
+                    entry.State = EntityState.Added;
+                else
+                    entry.State = EntityState.Modified;
+            }
+
+            // Delete triggers that were removed from the list
+            var currentTriggerIds = newSettings.Triggers
+                .Where(t => t.TriggerId != Guid.Empty)
+                .Select(t => t.TriggerId)
+                .ToHashSet();
+
+            var triggersToDelete = await _dbContext.Triggers
+                .Where(t => t.GuildId == guildId && !currentTriggerIds.Contains(t.TriggerId))
+                .ToListAsync();
+
+            _dbContext.Triggers.RemoveRange(triggersToDelete);
         }
         
-        // If oject does exist its changes are already being tracked
         await _dbContext.SaveChangesAsync();
 
-        // Update cache
+        // Detach all tracked entities to keep the DbContext clean
+        _dbContext.ChangeTracker.Clear();
+
+        // Update cache with the detached entity
         _cache.Set(GetCacheKey(guildId), newSettings);
 
         return newSettings;
@@ -115,27 +145,37 @@ public class GuildSettingsService
 
 
     /// <summary>
-    /// Delete a trigger on the targeted GuildSettings
+    /// Delete a trigger by its UUID on the targeted GuildSettings. Returns the deleted
+    /// trigger's pattern, or null if no trigger with that id exists on the guild.
+    /// Deletion is keyed on the stable TriggerId (no fragile positional index).
     /// </summary>
-    /// <param name="guildId"></param>
-    /// <param name="trigger"></param>
-    /// <returns></returns>
-    public async Task<bool> DeleteTrigger(ulong guildId, int triggerIndex)
+    public async Task<string?> DeleteTrigger(ulong guildId, Guid triggerId)
     {
         GuildSettings settings = await GetByIdAsync(guildId);
 
-        if (settings.Triggers.Count == 0)
-            throw new SlashCommandBusinessException($"There are no triggers on this server");
-        
-        var triggerId = settings.Triggers.OrderByDescending(x => x.CreatedAt)
-                                            .ToList()
-                                            .ElementAt(triggerIndex)
-                                            .TriggerId;
-        
+        Trigger? trigger = settings.Triggers.FirstOrDefault(t => t.TriggerId == triggerId);
+        if (trigger == null)
+            return null;
+
+        string pattern = trigger.Pattern;
+
         settings.Triggers.RemoveAll(x => x.TriggerId == triggerId);
+        await SaveOrUpdateAsync(guildId, settings);
 
-        GuildSettings updatedSettings = await SaveOrUpdateAsync(guildId, settings);
+        return pattern;
+    }
 
-        return true;
+
+    /// <summary>
+    /// Clear the cache for a specific guild
+    /// </summary>
+    /// <param name="guildId"></param>
+    /// <returns>True if the cache entry existed and was removed, false if it didn't exist</returns>
+    public bool ClearCacheForGuild(ulong guildId)
+    {
+        var cacheKey = GetCacheKey(guildId);
+        bool existed = _cache.TryGetValue(cacheKey, out _);
+        _cache.Remove(cacheKey);
+        return existed;
     }
 }

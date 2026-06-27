@@ -2,6 +2,7 @@ using NetCord;
 using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
+using Resources;
 
 namespace UserCommands;
 
@@ -13,7 +14,7 @@ public class IdModule : ApplicationCommandModule<ApplicationCommandContext>
             InteractionCallback.Message(
                 new InteractionMessageProperties
                 {
-                    Content = $"This user's ID is : `{user.Id}`",
+                    Content = $"`{user.Id}`",
                     Flags = MessageFlags.Ephemeral
                 }
             )

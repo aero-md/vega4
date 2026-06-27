@@ -1,18 +1,12 @@
+using static Core.GlobalRegistry;
+using System.Reflection;
 using NetCord;
 using NetCord.Gateway;
 using NetCord.Rest;
-using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
+using NetCord.Services.ComponentInteractions;
 using NetCord.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Core.Models;
 using Handlers;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Caching.Memory;
-using Exceptions;
 
 namespace Core;
 
@@ -22,12 +16,18 @@ public class Vega
     private ShardedGatewayClient ShardedClient { get; set; } = null!;
     // Initialize the command service so the property is non-null after construction
     private ApplicationCommandService<ApplicationCommandContext> ApplicationCommandService { get; set; } = null!;
+    private ComponentInteractionService<ButtonInteractionContext> ButtonInteractionService { get; set; } = null!;
+    private ComponentInteractionService<StringMenuInteractionContext> StringMenuInteractionService { get; set; } = null!;
+    private ComponentInteractionService<ModalInteractionContext> ModalInteractionService { get; set; } = null!;
+    
+    // Public access to the RestClient from ShardedGatewayClient
+    public RestClient Rest => ShardedClient.Rest;
 
     # region Constructor and Initializing
 
     public Vega(){}
 
-    public async Task Initialize(MessageCreateHandler msgCreateHandler, string botToken)
+    public async Task Initialize(string botToken)
     {
         // Use the fluent GatewayClientBuilder to create and configure the client and command service
         ShardedClient = new ShardedGatewayClient
@@ -43,121 +43,63 @@ public class Vega
         // Register all commands to Discord
         ApplicationCommandService = await Configurators.ApplicationCommandServiceBuilder
                                                         .Create()
-                                                        .AddCommandHandlers()
+                                                        .DiscoverCommands()
                                                         .BuildAsync(ShardedClient);
 
+        // Discover [ComponentInteraction] modules in this assembly. No remote
+        // registration needed — Discord identifies handlers by customId at click
+        // time, not at startup like slash commands.
+        ButtonInteractionService = new ComponentInteractionService<ButtonInteractionContext>();
+        ButtonInteractionService.AddModules(Assembly.GetExecutingAssembly());
+
+        // String select menus get their own service+context (AddModules only picks up
+        // modules whose context matches). Routed alongside buttons in InteractionCreate.
+        StringMenuInteractionService = new ComponentInteractionService<StringMenuInteractionContext>();
+        StringMenuInteractionService.AddModules(Assembly.GetExecutingAssembly());
+
+        // Modal submissions (e.g. /trigger add) get their own service+context.
+        ModalInteractionService = new ComponentInteractionService<ModalInteractionContext>();
+        ModalInteractionService.AddModules(Assembly.GetExecutingAssembly());
+
         // Misc Handlers (static)
-        ShardedClient.Connecting += async (client) => MiscHandlers.Connecting(client);
+        ShardedClient.Connecting += (client) =>
+        {
+            MiscHandlers.Connecting(client);
+            return ValueTask.CompletedTask;
+        };
         ShardedClient.Connect += async (client) => await MiscHandlers.Connected(client);
 
         // Message Create (singleton)
-        ShardedClient.MessageCreate += async (client, message) => await msgCreateHandler.MessageCreate(client, message);
+        ShardedClient.MessageCreate += async (client, message) => await MessageCreateHandler.MessageCreate(client, message);
 
-        // Interaction Create
+        // InteractionCommand Create (singleton)
         ShardedClient.InteractionCreate += async (client, interaction) =>
         {
-            if (interaction is not ApplicationCommandInteraction applicationCommandInteraction)
-                return;
-
-            string? errorMsg = null;
-            bool deferred = false;
-            
-            try
+            switch (interaction)
             {
-                IExecutionResult result = await ApplicationCommandService.ExecuteAsync(
-                    new ApplicationCommandContext(applicationCommandInteraction, client)
-                ).ConfigureAwait(false);
+                // Command Interaction
+                case ApplicationCommandInteraction cmdInteraction:
+                    await CommandInteractionHandler.HandleCommand(client, ApplicationCommandService, cmdInteraction);
+                    break;
 
-                // Case of exception thrown : rethrow the exception wrapped in the execution result
-                if (result is ExecutionExceptionResult executionExceptionResult)
-                    throw executionExceptionResult.Exception; 
+                // String select menus (more specific than MessageComponentInteraction, so listed first)
+                case StringMenuInteraction stringMenuInteraction:
+                    await ComponentInteractionHandler.HandleAsync(client, StringMenuInteractionService, stringMenuInteraction);
+                    break;
 
-                // Case of missing perm : wrap MissingPerm object into a custom exception and throw it
-                if (result is MissingPermissionsResult missingPerm)
-                {
-                    await interaction.SendResponseAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
-                    deferred = true;
-                    throw new MissingPermissionException(missingPerm);
-                }
-            }
-            catch (MissingPermissionException pex)
-            {   
-                var missingPerms = Enum.GetValues<Permissions>()
-                                       .Cast<Permissions>()
-                                       .Where(flag => pex.MissingPerm.MissingPermissions.HasFlag(flag))
-                                       .Select(flag => flag.ToString());
+                // Component Interaction (button clicks, etc.)
+                case MessageComponentInteraction componentInteraction:
+                    await ComponentInteractionHandler.HandleAsync(client, ButtonInteractionService, componentInteraction);
+                    break;
 
-                string strMissingPerms = string.Join(",", missingPerms);
+                // Modal submissions (e.g. /trigger add form)
+                case ModalInteraction modalInteraction:
+                    await ComponentInteractionHandler.HandleAsync(client, ModalInteractionService, modalInteraction);
+                    break;
 
-                switch (pex.MissingPerm.EntityType)
-                {
-                    case MissingPermissionsResultEntityType.Bot: 
-                        errorMsg = $"Can't execute command. Bot is missing permissions : {strMissingPerms}";
-                        break;
-                    case MissingPermissionsResultEntityType.User:
-                        errorMsg = $"You can't use this command. Missing permissions : {strMissingPerms}";
-                        break;
-                }
-            }
-            // Expected exception with user-readable message
-            catch (SlashCommandBusinessException bex)
-            {
-                errorMsg = bex.Message;
-                deferred = bex.Deferred;
-            }
-            // Unexpected, caught exception
-            catch (SlashCommandGenericException gex)
-            {
-                errorMsg = "Something went wrong while executing command ¯\\\\_(ツ)\\_/¯";
-                deferred = gex.Deferred;
-            }
-            // Worst case scenario : unexcepted uncaught exception
-            catch (Exception ex)
-            {
-                errorMsg = "Something went terribly wrong while executing command. Ask the dev to fix their broken code";
-            }
-
-            // If nay exception occurred, send failure response
-            if (errorMsg != null)
-            {
-                try
-                {
-                    // Reply in followup response to the deferred message
-                    if (deferred)
-                    {
-                        await interaction.SendFollowupMessageAsync(
-                            errorMsg
-                        );
-                    }
-                    // Reply to interaction
-                    else
-                    {   
-                        var elapsed = DateTimeOffset.UtcNow - interaction.CreatedAt;
-
-                        // Check if interaction can still be responded to directly
-                        // If not, log and do nothing
-                        if (elapsed.TotalSeconds > 2.5)
-                        {
-                            Console.WriteLine("Interaction took more than 2 (1 sec margin) sec to process).");
-                        }
-                        else
-                        {
-                            await interaction.SendResponseAsync(
-                                InteractionCallback.Message(
-                                    new InteractionMessageProperties
-                                    {
-                                        Content = errorMsg,
-                                        Flags = MessageFlags.Ephemeral
-                                    }
-                                )
-                            );
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Failed to send interaction failure response.", ex.Message);
-                }
+                // Unsupported interaction type
+                default:
+                    return;
             }
         };
     }
@@ -185,8 +127,5 @@ public class Vega
             await ShardedClient.Rest.BulkOverwriteGuildApplicationCommandsAsync(ShardedClient.Id, guildId.Value, empty);
         else
             await ShardedClient.Rest.BulkOverwriteGlobalApplicationCommandsAsync(ShardedClient.Id, empty);
-
-        // Terminate the bot after clearing commands
-        Environment.Exit(0);
     }
 }

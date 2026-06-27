@@ -5,7 +5,7 @@ using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
-namespace Models.CommandSpecificModels;
+namespace Models.Business;
 
 public class WaifuCategoryValue
 {
@@ -53,7 +53,7 @@ public interface IApiDefinition
     public string GetBaseUri(bool multiple = false);
     
     /// <summary>
-    /// All categories. NSFW Categories begin at ID 1000
+    /// All categories available in this API. Random/any is 0. Broad categories start at 1. Character specific categories start at 100. NSFW Categories start at 1000.
     /// </summary>
     public List<WaifuCategoryValue> Categories { get; }
 }
@@ -128,7 +128,7 @@ public class WaifuImApiReference : IApiDefinition
 {
     public class MultiplePicApiResponse
     {
-        [JsonPropertyName("images")]
+        [JsonPropertyName("items")]
         public required IEnumerable<ResponseImageItem> Images {get; set;}
     }
     public class ResponseImageItem
@@ -138,7 +138,7 @@ public class WaifuImApiReference : IApiDefinition
     }
 
     public string GetBaseUri(bool multiple = false){
-        return "https://api.waifu.im/search";
+        return "https://api.waifu.im/images";
     }
 
     public List<WaifuCategoryValue> Categories =>
