@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using Models;
@@ -12,8 +13,11 @@ namespace Resources;
 public static class ResourceHelper
 {
     private const string MISSING_RESSOURCE_MESSAGE = "Missing Resource";
-    private static readonly Dictionary<string, JsonDocument> _cachedDocuments = new();
-    private static readonly Dictionary<(string language, string path), string> _stringCache = new();
+    // Concurrent: GetString runs on gateway threads AND background threads (PollService timer,
+    // FeedWidgetButtons.RefreshListAsync). A plain Dictionary written from several threads can
+    // corrupt its internal state (100% CPU spin / IndexOutOfRangeException).
+    private static readonly ConcurrentDictionary<string, JsonDocument> _cachedDocuments = new();
+    private static readonly ConcurrentDictionary<(string language, string path), string> _stringCache = new();
 
     static ResourceHelper()
     {

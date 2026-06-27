@@ -85,6 +85,14 @@ public class FeedService
                 string.Format(Strings.Exceptions.FeedLimitReached, config.MaxFeedsPerGuild));
         }
 
+        // feeds.guild_id has an FK to guild_settings(guild_id), but a guild_settings row is
+        // otherwise only created when a trigger is added (GuildSettingsService.SaveOrUpdateAsync).
+        // Seed it here so /feed add works on a guild that never configured anything — otherwise
+        // Postgres rejects the insert with an FK violation (DbUpdateException). Same code path
+        // (entity Add) as the trigger flow, so the ulong→bigint mapping is identical.
+        if (!await dbContext.GuildSettings.AnyAsync(g => g.GuildId == feedProperties.GuildId))
+            dbContext.GuildSettings.Add(new GuildSettings(feedProperties.GuildId));
+
         dbContext.FeedProperties.Add(feedProperties);
         await dbContext.SaveChangesAsync();
 
@@ -276,10 +284,16 @@ public class FeedService
                 targetMinute = targetMinute.AddHours(1);
             
             var delay = targetMinute - now;
-            _logger.LogInformation("Feed {FeedId} (r/{Subreddit}) waiting {Delay} until minute {Minute}", 
+            _logger.LogInformation("Feed {FeedId} (r/{Subreddit}) waiting {Delay} until minute {Minute}",
                 feedProperties.FeedId, feedProperties.Topic, delay, feedProperties.StartAtMinute);
-            
+
             await Task.Delay(delay, cancellationToken);
+
+            // Post once at the requested minute. PeriodicTimer only fires after a full interval,
+            // so without this first post the user-requested ":MM" tick is skipped by one interval.
+            // Only when StartAtMinute is set: the unaligned path keeps waiting one interval to
+            // avoid reposting on every restart/deploy.
+            await ProcessFeedTickAsync(feedProperties);
         }
 
         // Use 'using' to properly dispose the timer

@@ -80,8 +80,7 @@ var serviceProvider = new ServiceCollection()
                             .AddSingleton<FeedService>()
                             // Poll service
                             .AddSingleton<PollService>()
-                            // Reminder service
-                            //.AddSingleton<ReminderService>()
+                            // Reminder service: not registered — feature is a placeholder (see ReminderService.cs)
                             // Scoped
                             .AddScoped<AppDbContext>()
                             .AddScoped<GuildSettingsService>()
@@ -108,8 +107,6 @@ await feedService.Initialize(vega.Rest);
 var pollService = serviceProvider.GetRequiredService<PollService>();
 await pollService.Initialize(vega.Rest);
 
-// Initialize ReminderService now that Vega (and its RestClient) is ready
-//var reminderService = serviceProvider.GetRequiredService<ReminderService>();
-//await reminderService.Initialize(vega.Rest);
+// Reminder feature is a placeholder (not registered/initialized) — see ReminderService.cs
 
 await vega.Launch();

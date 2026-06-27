@@ -1,4 +1,5 @@
 using Exceptions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Models.Entities;
 using NetCord;
@@ -414,6 +415,14 @@ public class FeedAddModal : ComponentInteractionModule<ModalInteractionContext>
         {
             // Subreddit validation failures from FeedService/FeedContentService.
             throw new SlashCommandBusinessException(ex.Message);
+        }
+        catch (DbUpdateException ex)
+        {
+            // The FK violation is now prevented (guild_settings is seeded in CreateNewFeedAsync),
+            // but if any other DB constraint trips, log it and surface a clean message instead of
+            // letting a raw DB exception bubble up as a generic "critical error".
+            Log.Error(ex, "DB error while creating feed r/{Subreddit} in guild {GuildId}", topic, guildId);
+            throw new SlashCommandBusinessException(Strings.Exceptions.InvalidParams);
         }
 
         // listMsgId == 0 means the modal was opened from /feed add (no list message to refresh).
