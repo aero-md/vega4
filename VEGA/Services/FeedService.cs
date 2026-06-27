@@ -17,6 +17,11 @@ public class FeedService
     private readonly FeedContentService _contentService;
     private readonly ILogger<FeedService> _logger;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _timersCancellationTokens = new();
+    // Consecutive 403 count per subreddit (lowercase key). In-memory only: a transient
+    // Reddit 403 shouldn't kill a feed on the first hit, but a sub that 403s repeatedly
+    // is treated as gone. Not persisted — assumed to be an edge case, resets on restart.
+    private readonly ConcurrentDictionary<string, int> _subredditFailures = new();
+    private const int MaxSubredditRetries = 5;
     private RestClient _restClient = null!;
 
     public FeedService(
@@ -311,6 +316,9 @@ public class FeedService
             // 1. Refresh Reddit cache for this subreddit if needed
             await _contentService.RefreshCacheIfNeededAsync(feed.Topic, config);
 
+            // Fetch succeeded → clear any accumulated 403 streak for this subreddit
+            _subredditFailures.TryRemove(feed.Topic.ToLowerInvariant(), out _);
+
             // 2. Get this feed's post history (optimized: only IDs)
             var historyIds = await GetFeedHistoryIdsAsync(feed.FeedId);
 
@@ -361,14 +369,33 @@ public class FeedService
             // 5. Save post to history
             await AddPostToFeedHistoryAsync(feed.FeedId, postId);
         }
-        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Forbidden 
-                                                             or System.Net.HttpStatusCode.NotFound)
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.NotFound)
         {
-            // Subreddit is private (403), banned, or doesn't exist (404) 
-            _logger.LogWarning("Reddit returned {StatusCode} for r/{Subreddit}, disabling feed {FeedId}",
-                ex.StatusCode, feed.Topic, feed.FeedId);
-            
+            // 404 = subreddit doesn't exist (anymore). Definitive → disable immediately.
+            _logger.LogWarning("Reddit returned 404 for r/{Subreddit}, disabling feed {FeedId}",
+                feed.Topic, feed.FeedId);
+
             await DisableFeedAsync(feed.FeedId, FeedStatus.TopicUnavailable);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Forbidden)
+        {
+            // 403 is ambiguous: private/banned sub, but also transient (UA, rate-limit, hiccup).
+            // Don't kill the feed on the first hit — retry in-memory up to MaxSubredditRetries.
+            var attempts = _subredditFailures.AddOrUpdate(feed.Topic.ToLowerInvariant(), 1, (_, n) => n + 1);
+
+            if (attempts >= MaxSubredditRetries)
+            {
+                _logger.LogWarning("Reddit returned 403 for r/{Subreddit} {Attempts} times, disabling feed {FeedId}",
+                    feed.Topic, attempts, feed.FeedId);
+
+                _subredditFailures.TryRemove(feed.Topic.ToLowerInvariant(), out _);
+                await DisableFeedAsync(feed.FeedId, FeedStatus.TopicUnavailable);
+            }
+            else
+            {
+                _logger.LogWarning("Reddit returned 403 for r/{Subreddit} (attempt {Attempts}/{Max}), retrying next tick",
+                    feed.Topic, attempts, MaxSubredditRetries);
+            }
         }
         catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.TooManyRequests)
         {

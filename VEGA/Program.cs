@@ -61,7 +61,9 @@ var serviceProvider = new ServiceCollection()
                             // HttpClientFactory with Polly retry for Reddit API
                             .AddHttpClient(HttpClientNames.Reddit, client =>
                             {
-                                client.DefaultRequestHeaders.Add("User-Agent", "VEGA Discord Bot/4.0");
+                                // Reddit rejects generic UAs with 403. Required format:
+                                // <platform>:<app-id>:<version> (by /u/<reddit-username>)
+                                client.DefaultRequestHeaders.Add("User-Agent", HttpClientNames.RedditUserAgent);
                             })
                             .AddPolicyHandler(retryPolicy)
                             .Services
